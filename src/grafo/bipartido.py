@@ -39,6 +39,7 @@ class GrafoBipartido:
         self._arestas: List[Aresta] = []
         self._adjacencia: Dict[str, Set[str]] = {}
         self._resultado: Optional[ResultadoBiparticao] = None
+        self._posicoes: Dict[str, Tuple[float, float]] = {}
 
     @property
     def vertices(self) -> Set[str]:
@@ -54,12 +55,19 @@ class GrafoBipartido:
 
         return self._resultado
 
+    @property
+    def posicoes(self) -> Dict[str, Tuple[float, float]]:
+        """Retorna um dicionário com posições opcionais dos vértices."""
+
+        return dict(self._posicoes)
+
     def carregar(self, dados: DadosGrafo) -> None:
         """Carrega o grafo a partir de ``DadosGrafo``."""
 
         self._vertices = set(dados.vertices)
         self._arestas = list(dados.arestas)
         self._adjacencia = {vertice: set() for vertice in self._vertices}
+        self._posicoes = dict(dados.posicoes)
 
         for origem, destino in self._arestas:
             self._adjacencia.setdefault(origem, set()).add(destino)
@@ -137,4 +145,5 @@ class GrafoBipartido:
             "particao_a": sorted(particao_a),
             "particao_b": sorted(particao_b),
             "conflitos": [list(conflito) for conflito in self._resultado.conflitos],
+            "posicoes": {vertice: list(posicao) for vertice, posicao in self._posicoes.items()},
         }

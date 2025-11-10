@@ -1,0 +1,15 @@
+# Rede usuário-filme com preferências complementares
+[vertices]
+usuaria_ana tipo=usuario pos=0.15,0.85
+usuaria_bia tipo=usuario pos=0.15,0.50
+usuario_caio tipo=usuario pos=0.15,0.15
+filme_matriz tipo=filme pos=0.80,0.85
+filme_her tipo=filme pos=0.80,0.50
+filme_up tipo=filme pos=0.80,0.15
+[arestas]
+usuaria_ana filme_matriz
+usuaria_ana filme_her
+usuaria_bia filme_her
+usuaria_bia filme_up
+usuario_caio filme_matriz
+usuario_caio filme_up
