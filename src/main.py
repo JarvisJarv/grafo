@@ -3,9 +3,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from grafo.bipartido import GrafoBipartido
+if __package__ in (None, ""):
+    # Permite executar ``python src/main.py`` ajustando o caminho para ``src/``.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from grafo.bipartido import GrafoBipartido
+else:
+    from .grafo.bipartido import GrafoBipartido
 
 
 def main() -> None:
@@ -68,7 +74,10 @@ def main() -> None:
 
     if args.plot:
         try:
-            from grafo.visualizacao import exibir_grafo
+            if __package__ in (None, ""):
+                from grafo.visualizacao import exibir_grafo
+            else:
+                from .grafo.visualizacao import exibir_grafo
 
             exibir_grafo(grafo, layout=args.layout, titulo=f"Resultado para {args.arquivo}")
         except ImportError as exc:
@@ -80,7 +89,10 @@ def main() -> None:
 
     if args.animar or args.exportar_animacao:
         try:
-            from grafo.visualizacao import animar_verificacao
+            if __package__ in (None, ""):
+                from grafo.visualizacao import animar_verificacao
+            else:
+                from .grafo.visualizacao import animar_verificacao
 
             animar_verificacao(
                 grafo,
