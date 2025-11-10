@@ -16,6 +16,17 @@ def main() -> None:
         action="store_true",
         help="Exibe o resultado completo em formato JSON",
     )
+    parser.add_argument(
+        "--plot",
+        action="store_true",
+        help="Abre uma visualização gráfica com as partições e conflitos",
+    )
+    parser.add_argument(
+        "--layout",
+        choices=("spring", "circular", "kamada_kawai"),
+        default="spring",
+        help="Algoritmo de posicionamento dos vértices ao exibir o grafo",
+    )
     args = parser.parse_args()
 
     grafo = GrafoBipartido()
@@ -35,6 +46,18 @@ def main() -> None:
                 print(f"    - {origem} -- {destino}")
         else:
             print("  Nenhum conflito detectado.")
+
+    if args.plot:
+        try:
+            from grafo.visualizacao import exibir_grafo
+
+            exibir_grafo(grafo, layout=args.layout, titulo=f"Resultado para {args.arquivo}")
+        except ImportError as exc:
+            mensagem = (
+                "Dependências de visualização não disponíveis. "
+                "Instale 'matplotlib' e 'networkx' para utilizar --plot."
+            )
+            raise SystemExit(f"{mensagem}\nDetalhes: {exc}") from exc
 
 
 if __name__ == "__main__":
