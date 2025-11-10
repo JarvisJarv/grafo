@@ -12,15 +12,12 @@ O algoritmo percorre os vértices em ordem crescente.
 
 ## Passos detalhados
 
-| Passo | Ação | Fila após a ação | Cores registradas | Conflitos |
-|-------|------|------------------|-------------------|-----------|
-| 1 | Escolhe vértice inicial **1**, define cor 0 e o coloca na fila | `[1]` | `1→0` | `—` |
-| 2 | Remove **1** da fila. Vizinho **2** sem cor → atribui cor 1 e enfileira | `[2]` | `1→0, 2→1` | `—` |
-| 3 | Ainda processando vizinhos de **1**: vizinho **3** sem cor → atribui cor 1 e enfileira | `[2, 3]` | `1→0, 2→1, 3→1` | `—` |
-| 4 | Remove **2** da fila. Vizinho **1** já colorido com cor diferente → nada muda | `[3]` | `1→0, 2→1, 3→1` | `—` |
-| 5 | Vizinho **3** de **2** já colorido com **1** → detecta conflito (mesma cor) | `[3]` | `1→0, 2→1, 3→1` | `(2, 3)` |
-| 6 | Remove **3** da fila. Vizinho **1** já colorido com cor diferente → nada muda | `[]` | `1→0, 2→1, 3→1` | `(2, 3)` |
-| 7 | Vizinho **2** de **3** também cor 1 → registra conflito já conhecido | `[]` | `1→0, 2→1, 3→1` | `(2, 3)` |
+| Passo | Operação | Vértice atual | Fila | Processados | Cores | Conflitos |
+|-------|----------|---------------|------|-------------|-------|-----------|
+| 1 | Escolhe vértice inicial **1**, define cor 0 e o coloca na fila | `—` | `[1]` | `[]` | `1→0` | `—` |
+| 2 | Remove **1** da fila, visita vizinhos **2** e **3** (ambos recebem cor 1 e entram na fila) | `1` | `[2, 3]` | `[1]` | `1→0, 2→1, 3→1` | `—` |
+| 3 | Remove **2** da fila, verifica vizinhos (conflito detectado entre **2** e **3** com mesma cor) | `2` | `[3]` | `[1, 2]` | `1→0, 2→1, 3→1` | `(2, 3)` |
+| 4 | Remove **3** da fila, revisita vizinhos já processados e confirma conflito existente | `3` | `[]` | `[1, 2, 3]` | `1→0, 2→1, 3→1` | `(2, 3)` |
 
 ## Resultado final
 - **Cores**: vértice 1 → cor 0; vértices 2 e 3 → cor 1.
@@ -28,4 +25,3 @@ O algoritmo percorre os vértices em ordem crescente.
 - **Conclusão**: o grafo NÃO é bipartido, pois contém um ciclo ímpar.
 
 > Dica: execute `python -m src.main exemplos/nao_bipartido.txt --json` para obter o mesmo resultado pela CLI. As mídias podem ser (re)geradas com `python scripts/gerar_midias.py` e ficam disponíveis em `docs/imagens/`.
-
