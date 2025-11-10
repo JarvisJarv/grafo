@@ -38,7 +38,7 @@ Todas as opções são adicionais ao caminho do arquivo. Você pode combiná-las
 | `--plot` | Abre uma janela com o grafo desenhado, destacando partições e conflitos. Requer `matplotlib` e `networkx`. | `python -m src.main exemplos/usuario_filme_equilibrado.txt --plot` |
 | `--animar` | Mostra uma animação passo a passo da BFS que colore o grafo. | `python -m src.main exemplos/nao_bipartido.txt --animar` |
 | `--exportar-animacao CAMINHO` | Gera um GIF ou MP4 com a mesma animação do `--animar`. Use com ou sem `--animar`. | `python -m src.main exemplos/nao_bipartido.txt --exportar-animacao docs/imagens/demo.gif` |
-| `--layout {spring,circular,kamada_kawai,bipartido,flechas}` | Escolhe o layout do desenho. `spring` é o padrão; `flechas` agrupa as partições em ovais destacadas. | `python -m src.main exemplos/usuario_filme_equilibrado.txt --plot --layout flechas` |
+| `--layout {spring,circular,kamada_kawai,bipartido,flechas}` | Escolhe o layout do desenho. `spring` é o padrão; `flechas` cria duas colunas com setas entre as partições. | `python -m src.main exemplos/usuario_filme_equilibrado.txt --plot --layout flechas` |
 | `--fps N` | Ajusta a velocidade da animação/exportação. Use um número maior para acelerar. | `python -m src.main exemplos/nao_bipartido.txt --animar --fps 3` |
 
 > 💡 **Dica:** se `--plot` ou `--animar` avisarem que `matplotlib`/`networkx` não estão instalados, rode `pip install matplotlib networkx` dentro do seu ambiente virtual.
