@@ -46,7 +46,7 @@ Os grafos são descritos em arquivos `.txt` compatíveis com `carregar_de_arquiv
 ## Referências e links
 - **Referência teórica**: Robert Sedgewick; Kevin Wayne. *Algorithms*, 4ª edição, Addison-Wesley, 2011. Capítulo 4 (Grafos) descreve a verificação de bipartição por BFS.
 - **Datasets recomendados**: MovieLens (https://grouplens.org/datasets/movielens/) para grafos usuário–filme; bipartições acadêmicas disponíveis em https://snap.stanford.edu/data/.
-- **Apresentação**: [Slides “Verificação de grafos bipartidos por BFS”](slides-biparticao.md).
+- **Apresentação**: [Slides “Verificação de grafos bipartidos por BFS”](../apresentacao/slides-biparticao.md).
 - **Planilha**: [Planilha de acompanhamento de testes](https://docs.google.com/spreadsheets/d/1L5ExamplePlanilhaBipartido).
 - **Vídeo**: [Demonstração da animação de coloração](https://youtu.be/ExampleVideoBipartido).
 - **Documentação complementar**: teste de mesa detalhado (`teste-de-mesa.md`) e guia dos datasets usuário–filme (`usuario-filme-datasets.md`).
