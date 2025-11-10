@@ -37,8 +37,28 @@ Um passo a passo mais detalhado, com exemplos de combinações de opções da CL
 - `--plot`: abre uma visualização estática destacando as partições e conflitos.
 - `--animar`: executa a animação dos passos do algoritmo.
 - `--exportar-animacao CAMINHO`: salva a animação em GIF ou MP4 para o caminho informado.
-- `--layout {spring,circular,kamada_kawai}`: escolhe o algoritmo de posicionamento dos vértices.
+- `--layout {spring,circular,kamada_kawai,bipartido}`: escolhe o algoritmo de posicionamento dos vértices.
 - `--fps N`: define a taxa de quadros da animação ou exportação (valor mínimo 1).
+
+## Interface gráfica moderna
+
+Para quem prefere uma experiência visual completa, o projeto inclui uma aplicação
+PySide6 que combina o verificador com um painel de visualização interativo.
+
+1. Instale as dependências com suporte a Qt (`pip install -r requirements.txt`).
+2. Execute `python -m grafo.interface`.
+3. Escolha um arquivo `.txt` existente ou escreva um novo arquivo na aba "Criar
+   arquivo .txt". A aplicação traz exemplos prontos (como Gabriel × Filmes) e um
+   guia de formatação embutido.
+
+Recursos disponíveis na interface:
+
+- Diagrama com layout moderno e legendas coloridas para as partições.
+- Destaque automático das arestas conflitantes em vermelho.
+- Painel com o resumo do algoritmo (partições, quantidade de conflitos e arestas).
+- Lista de relacionamentos legíveis no formato "Usuário → Filmes assistidos".
+- Editor integrado para montar novos grafos bipartidos e salvar/visualizar o
+  resultado instantaneamente.
 
 ## Uso como biblioteca
 Para importar os módulos diretamente em um REPL ou script, adicione o diretório `src/` ao `PYTHONPATH`:

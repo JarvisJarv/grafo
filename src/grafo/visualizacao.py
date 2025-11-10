@@ -33,6 +33,35 @@ def _calcular_posicoes(grafo_nx: nx.Graph, layout: str) -> Posicoes:
     return nx.spring_layout(grafo_nx, seed=42)
 
 
+def _calcular_posicoes_bipartido(resultado: ResultadoBiparticao) -> Posicoes:
+    """Gera um layout em duas colunas para grafos bipartidos."""
+
+    particao_a, particao_b = (sorted(particao) for particao in resultado.particoes)
+    posicoes: Posicoes = {}
+
+    if not particao_a and not particao_b:
+        return posicoes
+
+    altura_a = max(len(particao_a) - 1, 1)
+    altura_b = max(len(particao_b) - 1, 1)
+
+    for indice, vertice in enumerate(particao_a):
+        if len(particao_a) <= 1:
+            y = 0.5
+        else:
+            y = 1 - indice / altura_a
+        posicoes[vertice] = (0.1, y)
+
+    for indice, vertice in enumerate(particao_b):
+        if len(particao_b) <= 1:
+            y = 0.5
+        else:
+            y = 1 - indice / altura_b
+        posicoes[vertice] = (0.9, y)
+
+    return posicoes
+
+
 def _construir_grafo_networkx(grafo: GrafoBipartido) -> nx.Graph:
     """Converte ``GrafoBipartido`` para ``networkx.Graph``."""
 
@@ -104,6 +133,36 @@ def _formatar_texto_passo(passo: PassoBiparticao) -> str:
     )
 
 
+def preparar_desenho(
+    grafo: GrafoBipartido, *, layout: str = "spring"
+) -> Tuple[nx.Graph, Posicoes, List[str], List[str], ResultadoBiparticao]:
+    """Prepara os elementos necessários para desenhar um grafo."""
+
+    layout = layout.lower()
+    resultado = _obter_resultado(grafo)
+    grafo_nx = _construir_grafo_networkx(grafo)
+
+    posicoes: Posicoes = {}
+    posicoes_definidas = grafo.posicoes
+    if posicoes_definidas:
+        posicoes.update({vertice: posicoes_definidas[vertice] for vertice in grafo_nx.nodes if vertice in posicoes_definidas})
+
+    faltantes = [vertice for vertice in grafo_nx.nodes if vertice not in posicoes]
+    if faltantes:
+        if layout == "bipartido" and resultado.eh_bipartido:
+            posicoes_calculadas = _calcular_posicoes_bipartido(resultado)
+        else:
+            subgrafo = grafo_nx.subgraph(faltantes).copy()
+            posicoes_calculadas = _calcular_posicoes(subgrafo, layout)
+        posicoes.update({vertice: posicoes_calculadas.get(vertice, (0.0, 0.0)) for vertice in faltantes})
+
+    cores_por_vertice = _cores_vertices(resultado)
+    cores_vertices = [cores_por_vertice.get(vertice, "tab:gray") for vertice in grafo_nx.nodes]
+    cores_arestas = list(_cores_arestas_lista(grafo_nx.edges, resultado))
+
+    return grafo_nx, posicoes, cores_vertices, cores_arestas, resultado
+
+
 def exibir_grafo(
     grafo: GrafoBipartido,
     *,
@@ -113,29 +172,11 @@ def exibir_grafo(
     mostrar: bool = True,
     caminho_saida: str | Path | None = None,
 ) -> None:
-    """Renderiza o grafo destacando as partições e conflitos.
+    """Renderiza o grafo destacando as partições e conflitos."""
 
-    Quando ``mostrar`` é ``False`` o gráfico é apenas renderizado em memória.
-    Opcionalmente é possível salvar a figura informando ``caminho_saida``.
-    """
-
-    resultado = _obter_resultado(grafo)
-    grafo_nx = _construir_grafo_networkx(grafo)
-
-    posicoes_definidas = grafo.posicoes
-    if posicoes_definidas:
-        posicoes = {vertice: posicoes_definidas[vertice] for vertice in grafo_nx.nodes if vertice in posicoes_definidas}
-        faltantes = [vertice for vertice in grafo_nx.nodes if vertice not in posicoes]
-        if faltantes:
-            subgrafo = grafo_nx.subgraph(faltantes).copy()
-            posicoes_calculadas = _calcular_posicoes(subgrafo, layout)
-            posicoes.update(posicoes_calculadas)
-    else:
-        posicoes = _calcular_posicoes(grafo_nx, layout)
-
-    cores_vertices = _cores_vertices(resultado)
-    cores_padrao_vertices = [cores_vertices.get(vertice, "tab:gray") for vertice in grafo_nx.nodes]
-    cores_arestas = list(_cores_arestas_lista(grafo_nx.edges, resultado))
+    grafo_nx, posicoes, cores_vertices, cores_arestas, resultado = preparar_desenho(
+        grafo, layout=layout
+    )
 
     fig, eixo = plt.subplots(figsize=(8, 6))
     nx.draw_networkx_edges(grafo_nx, posicoes, ax=eixo, edge_color=cores_arestas, width=2)
@@ -143,7 +184,7 @@ def exibir_grafo(
         grafo_nx,
         posicoes,
         ax=eixo,
-        node_color=cores_padrao_vertices,
+        node_color=cores_vertices,
         node_size=900,
         linewidths=1.5,
         edgecolors="black",
@@ -202,18 +243,7 @@ def animar_verificacao(
     """Cria uma animação destacando as etapas da verificação do grafo."""
 
     resultado, passos = grafo.verificar_biparticao_com_passos()
-    grafo_nx = _construir_grafo_networkx(grafo)
-
-    posicoes_definidas = grafo.posicoes
-    if posicoes_definidas:
-        posicoes = {vertice: posicoes_definidas[vertice] for vertice in grafo_nx.nodes if vertice in posicoes_definidas}
-        faltantes = [vertice for vertice in grafo_nx.nodes if vertice not in posicoes]
-        if faltantes:
-            subgrafo = grafo_nx.subgraph(faltantes).copy()
-            posicoes_calculadas = _calcular_posicoes(subgrafo, layout)
-            posicoes.update(posicoes_calculadas)
-    else:
-        posicoes = _calcular_posicoes(grafo_nx, layout)
+    grafo_nx, posicoes, _, _, _ = preparar_desenho(grafo, layout=layout)
 
     fig, eixo = plt.subplots(figsize=(8, 6))
     colecao_arestas = nx.draw_networkx_edges(grafo_nx, posicoes, ax=eixo, width=2)
