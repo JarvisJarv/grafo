@@ -61,6 +61,11 @@ class GrafoBipartido:
     def arestas(self) -> List[Aresta]:
         return list(self._arestas)
 
+    def adjacencias(self) -> Dict[str, Set[str]]:
+        """Retorna uma cópia do dicionário de adjacências."""
+
+        return {vertice: set(vizinhos) for vertice, vizinhos in self._adjacencia.items()}
+
     @property
     def resultado(self) -> Optional[ResultadoBiparticao]:
         """Retorna o último resultado calculado."""
