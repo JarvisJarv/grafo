@@ -17,6 +17,12 @@ except ImportError as exc:  # pragma: no cover - tratado pelo chamador
 Posicoes = Dict[str, Tuple[float, float]]
 
 
+def _deslocar_rotulos(posicoes: Posicoes, deslocamento: float = 0.085) -> Posicoes:
+    """Move os rótulos ligeiramente para cima dos vértices."""
+
+    return {vertice: (coord[0], coord[1] + deslocamento) for vertice, coord in posicoes.items()}
+
+
 def _calcular_posicoes(grafo_nx: nx.Graph, layout: str) -> Posicoes:
     """Calcula a posição dos vértices conforme o layout desejado."""
 
@@ -191,7 +197,15 @@ def exibir_grafo(
         linewidths=1.5,
         edgecolors="black",
     )
-    nx.draw_networkx_labels(grafo_nx, posicoes, ax=eixo, font_weight="bold")
+    posicoes_rotulos = _deslocar_rotulos(posicoes)
+    nx.draw_networkx_labels(
+        grafo_nx,
+        posicoes_rotulos,
+        ax=eixo,
+        font_weight="bold",
+        verticalalignment="bottom",
+        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="none", alpha=0.85),
+    )
 
     eixo.set_axis_off()
 
@@ -259,7 +273,15 @@ def animar_verificacao(
         linewidths=1.5,
         edgecolors="black",
     )
-    nx.draw_networkx_labels(grafo_nx, posicoes, ax=eixo, font_weight="bold")
+    posicoes_rotulos = _deslocar_rotulos(posicoes)
+    nx.draw_networkx_labels(
+        grafo_nx,
+        posicoes_rotulos,
+        ax=eixo,
+        font_weight="bold",
+        verticalalignment="bottom",
+        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="none", alpha=0.85),
+    )
 
     eixo.set_axis_off()
 
