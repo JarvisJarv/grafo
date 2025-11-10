@@ -1,0 +1,16 @@
+# Rede usuário-filme com sobreposição de gostos populares
+[vertices]
+usuario_duda tipo=usuario x=0.12 y=0.82
+usuario_eva tipo=usuario x=0.18 y=0.48
+usuario_fred tipo=usuario
+filme_inception tipo=filme x=0.78 y=0.82
+filme_amor_em_paris tipo=filme x=0.82 y=0.46
+filme_comedia_noite tipo=filme
+[arestas]
+usuario_duda filme_inception
+usuario_duda filme_comedia_noite
+usuario_eva filme_amor_em_paris
+usuario_eva filme_comedia_noite
+usuario_fred filme_inception
+usuario_fred filme_amor_em_paris
+usuario_fred filme_comedia_noite

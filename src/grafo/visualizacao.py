@@ -73,7 +73,17 @@ def exibir_grafo(
 
     resultado = _obter_resultado(grafo)
     grafo_nx = _construir_grafo_networkx(grafo)
-    posicoes = _calcular_posicoes(grafo_nx, layout)
+
+    posicoes_definidas = grafo.posicoes
+    if posicoes_definidas:
+        posicoes = {vertice: posicoes_definidas[vertice] for vertice in grafo_nx.nodes if vertice in posicoes_definidas}
+        faltantes = [vertice for vertice in grafo_nx.nodes if vertice not in posicoes]
+        if faltantes:
+            subgrafo = grafo_nx.subgraph(faltantes).copy()
+            posicoes_calculadas = _calcular_posicoes(subgrafo, layout)
+            posicoes.update(posicoes_calculadas)
+    else:
+        posicoes = _calcular_posicoes(grafo_nx, layout)
 
     cores_vertices = _cores_vertices(resultado)
     cores_padrao_vertices = [cores_vertices.get(vertice, "tab:gray") for vertice in grafo_nx.nodes]
