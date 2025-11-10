@@ -19,8 +19,11 @@ Este repositório reúne os artefatos desenvolvidos para o estudo de grafos bipa
 - Slides com conceitos, teoria e demonstração em `docs/apresentacao/slides-biparticao.md`.
 - Instruções para gerar animações, capturas e roteiro de apresentação em `docs/apresentacao/`.
 - Planilha de acompanhamento descrita em `docs/trabalho/teste-de-mesa.md` e materiais de apoio citados no relatório.
+- Guia integrando todos os entregáveis e explicando como rodar cada parte do projeto em [`docs/tutorial_artefatos.md`](docs/tutorial_artefatos.md).
 
 ## Como executar
+Um passo a passo mais detalhado, com exemplos de combinações de opções da CLI, está em [`docs/tutorial_cli.md`](docs/tutorial_cli.md).
+
 1. Instale as dependências: `pip install -r requirements.txt`.
 2. Escolha um arquivo de entrada em `exemplos/`. Existem variantes como `bipartido.txt`, `usuario_filme_equilibrado.txt` e `usuario_filme_tendencias.txt`. O arquivo legado `usuario_filme_bipartido.txt` continua compatível caso esteja no seu diretório local.
 3. Rode o verificador com um arquivo de exemplo:
