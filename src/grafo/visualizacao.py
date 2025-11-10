@@ -36,27 +36,27 @@ def _calcular_posicoes(grafo_nx: nx.Graph, layout: str) -> Posicoes:
 def _calcular_posicoes_bipartido(resultado: ResultadoBiparticao) -> Posicoes:
     """Gera um layout em duas colunas para grafos bipartidos."""
 
-    particao_a, particao_b = (sorted(particao) for particao in resultado.particoes)
+    particao_0, particao_1 = (sorted(resultado.particao(cor)) for cor in (0, 1))
     posicoes: Posicoes = {}
 
-    if not particao_a and not particao_b:
+    if not particao_0 and not particao_1:
         return posicoes
 
-    altura_a = max(len(particao_a) - 1, 1)
-    altura_b = max(len(particao_b) - 1, 1)
+    altura_0 = max(len(particao_0) - 1, 1)
+    altura_1 = max(len(particao_1) - 1, 1)
 
-    for indice, vertice in enumerate(particao_a):
-        if len(particao_a) <= 1:
+    for indice, vertice in enumerate(particao_1):
+        if len(particao_1) <= 1:
             y = 0.5
         else:
-            y = 1 - indice / altura_a
+            y = 1 - indice / altura_1
         posicoes[vertice] = (0.1, y)
 
-    for indice, vertice in enumerate(particao_b):
-        if len(particao_b) <= 1:
+    for indice, vertice in enumerate(particao_0):
+        if len(particao_0) <= 1:
             y = 0.5
         else:
-            y = 1 - indice / altura_b
+            y = 1 - indice / altura_0
         posicoes[vertice] = (0.9, y)
 
     return posicoes

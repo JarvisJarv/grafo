@@ -68,6 +68,13 @@ def main() -> None:
         print("Grafo bipartido:" if resultado.eh_bipartido else "Grafo NÃO bipartido:")
         print(f"  Partição 0: {', '.join(sorted(particao_a)) or '∅'}")
         print(f"  Partição 1: {', '.join(sorted(particao_b)) or '∅'}")
+        relacionamentos = grafo.relacionamentos_formatados()
+        if relacionamentos:
+            print("  Relacionamentos:")
+            for relacao in relacionamentos:
+                print(f"    - {relacao}")
+        else:
+            print("  Nenhum relacionamento encontrado.")
         if resultado.conflitos:
             print("  Conflitos detectados:")
             for origem, destino in resultado.conflitos:
