@@ -28,14 +28,24 @@ Este repositório reúne os artefatos desenvolvidos para o estudo de grafos bipa
 ## Como executar
 1. (Opcional) Crie um ambiente virtual e instale as dependências: `pip install -r requirements.txt`.
 2. Escolha um arquivo de entrada em `exemplos/`. Existem variantes como `bipartido.txt`, `usuario_filme_equilibrado.txt` e `usuario_filme_tendencias.txt` (o antigo `usuario_filme_bipartido.txt` continua compatível caso esteja no seu diretório local).
-3. Rode o verificador com um arquivo de exemplo:
+3. No terminal (PowerShell no Windows ou bash no Linux/macOS), execute um dos comandos abaixo para rodar o verificador:
    - usando o módulo: `python -m src.main exemplos/bipartido.txt`
-   - executando diretamente: `python src/main.py exemplos/nao_bipartido.txt --json`
+   - executando diretamente: `python src/main.py exemplos/bipartido.txt`
+   - exibindo o relatório completo em JSON: `python -m src.main exemplos/nao_bipartido.txt --json`
    - comando legado (caso esteja usando o arquivo antigo): `python -m src.main exemplos/usuario_filme_bipartido.txt --plot`
 4. Para visualizar ou animar a execução:
-   - Visualização estática: acrescente `--plot` aos comandos anteriores.
+   - Visualização estática: acrescente `--plot` aos comandos anteriores (ex.: `python -m src.main exemplos/bipartido.txt --plot`).
    - Animação passo a passo: `python -m src.main exemplos/nao_bipartido.txt --animar`.
    - Exportar mídia: `python -m src.main exemplos/nao_bipartido.txt --animar --exportar-animacao docs/imagens/biparticao.gif`.
+
+### Teste rápido com Usuários × Filmes
+Para validar especificamente a relação de recomendação Usuário × Filme:
+
+```powershell
+python -m src.main exemplos/usuario_filme_equilibrado.txt --json
+```
+
+O comando acima lê o arquivo de texto, verifica a bipartição entre pessoas e filmes e exibe as duas partições, além de conflitos (se existirem). Também é possível acrescentar `--plot` ou `--animar` para inspecionar visualmente o grafo.
 
 ## Geração de mídias automáticas
 Execute `python scripts/gerar_midias.py` para produzir capturas e animações utilizadas na apresentação. Os arquivos são salvos em `docs/imagens/` (pasta ignorada pelo Git).
