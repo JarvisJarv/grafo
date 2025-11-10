@@ -1,0 +1,5 @@
+# Grafo bipartido simples
+u v
+u w
+x v
+x w
