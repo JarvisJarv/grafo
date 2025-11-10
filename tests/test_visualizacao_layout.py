@@ -23,13 +23,13 @@ def grafo_usuarios_filmes() -> GrafoBipartido:
 def test_layout_bipartido_posiciona_colunas(grafo_usuarios_filmes: GrafoBipartido) -> None:
     grafo_nx, posicoes, _, _, resultado = preparar_desenho(grafo_usuarios_filmes, layout="bipartido")
 
-    particao_a, particao_b = resultado.particoes
-    xs_a = {round(posicoes[vertice][0], 1) for vertice in particao_a}
-    xs_b = {round(posicoes[vertice][0], 1) for vertice in particao_b}
+    particao_0, particao_1 = resultado.particoes
+    xs_particao_0 = {round(posicoes[vertice][0], 1) for vertice in particao_0}
+    xs_particao_1 = {round(posicoes[vertice][0], 1) for vertice in particao_1}
 
-    assert xs_a == {0.1}
-    assert xs_b == {0.9}
-    assert set(grafo_nx.nodes) == particao_a | particao_b
+    assert xs_particao_1 == {0.1}
+    assert xs_particao_0 == {0.9}
+    assert set(grafo_nx.nodes) == particao_0 | particao_1
 
 
 def test_adjacencias_retorna_copia(grafo_usuarios_filmes: GrafoBipartido) -> None:
@@ -45,10 +45,23 @@ def test_adjacencias_retorna_copia(grafo_usuarios_filmes: GrafoBipartido) -> Non
 def test_layout_flechas_herda_posicoes_do_bipartido(grafo_usuarios_filmes: GrafoBipartido) -> None:
     _, posicoes, _, _, resultado = preparar_desenho(grafo_usuarios_filmes, layout="flechas")
 
-    particao_a, particao_b = resultado.particoes
-    xs_a = {round(posicoes[vertice][0], 1) for vertice in particao_a}
-    xs_b = {round(posicoes[vertice][0], 1) for vertice in particao_b}
+    particao_0, particao_1 = resultado.particoes
+    xs_particao_0 = {round(posicoes[vertice][0], 1) for vertice in particao_0}
+    xs_particao_1 = {round(posicoes[vertice][0], 1) for vertice in particao_1}
 
-    assert xs_a in ({0.1}, {0.9})
-    assert xs_b in ({0.1}, {0.9})
-    assert xs_a != xs_b
+    assert xs_particao_1 in ({0.1}, {0.9})
+    assert xs_particao_0 in ({0.1}, {0.9})
+    assert xs_particao_1 != xs_particao_0
+
+
+def test_relacionamentos_formatados_prioriza_usuarios(
+    grafo_usuarios_filmes: GrafoBipartido,
+) -> None:
+    relacoes = grafo_usuarios_filmes.relacionamentos_formatados()
+
+    assert relacoes == [
+        "gabriel x filme_mad_max",
+        "gabriel x filme_matrix",
+        "marcelo x filme_mad_max",
+        "larissa x filme_totoro",
+    ]

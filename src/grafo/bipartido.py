@@ -239,6 +239,41 @@ class GrafoBipartido:
         assert self._resultado is not None
         return list(self._resultado.conflitos)
 
+    def relacionamentos_formatados(self) -> List[str]:
+        """Lista as arestas orientadas como ``usuário x filme`` quando possível."""
+
+        if self._resultado is None:
+            self.verificar_biparticao()
+
+        assert self._resultado is not None
+        tipos_particoes = self.tipos_por_particao()
+        relacionamentos: List[str] = []
+
+        for origem, destino in self._arestas:
+            tipo_origem = self._atributos.get(origem, {}).get("tipo", "").lower()
+            tipo_destino = self._atributos.get(destino, {}).get("tipo", "").lower()
+            cor_origem = self._resultado.cores.get(origem)
+            cor_destino = self._resultado.cores.get(destino)
+
+            if tipo_origem == "usuario" and tipo_destino == "filme":
+                usuario, filme = origem, destino
+            elif tipo_destino == "usuario" and tipo_origem == "filme":
+                usuario, filme = destino, origem
+            elif tipos_particoes.get(cor_origem) == "usuario" and tipos_particoes.get(cor_destino) == "filme":
+                usuario, filme = origem, destino
+            elif tipos_particoes.get(cor_destino) == "usuario" and tipos_particoes.get(cor_origem) == "filme":
+                usuario, filme = destino, origem
+            elif cor_origem == 1 and cor_destino == 0:
+                usuario, filme = origem, destino
+            elif cor_destino == 1 and cor_origem == 0:
+                usuario, filme = destino, origem
+            else:
+                usuario, filme = origem, destino
+
+            relacionamentos.append(f"{usuario} x {filme}")
+
+        return relacionamentos
+
     def como_dicionario(self) -> Dict[str, object]:
         """Interface simples para expor o resultado do algoritmo."""
 
