@@ -3,3 +3,6 @@ __pycache__/
 
 # Ambiente virtual
 .venv/
+
+# Mídias geradas automaticamente (não versionadas)
+docs/imagens/
