@@ -110,8 +110,14 @@ def exibir_grafo(
     layout: str = "spring",
     titulo: str | None = None,
     mostrar_legenda: bool = True,
+    mostrar: bool = True,
+    caminho_saida: str | Path | None = None,
 ) -> None:
-    """Renderiza o grafo destacando as partições e conflitos."""
+    """Renderiza o grafo destacando as partições e conflitos.
+
+    Quando ``mostrar`` é ``False`` o gráfico é apenas renderizado em memória.
+    Opcionalmente é possível salvar a figura informando ``caminho_saida``.
+    """
 
     resultado = _obter_resultado(grafo)
     grafo_nx = _construir_grafo_networkx(grafo)
@@ -162,7 +168,16 @@ def exibir_grafo(
         eixo.legend(handles=elementos_legenda, loc="upper right")
 
     plt.tight_layout()
-    plt.show()
+
+    if caminho_saida is not None:
+        caminho = Path(caminho_saida)
+        caminho.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(caminho, dpi=150)
+
+    if mostrar:
+        plt.show()
+    else:
+        plt.close(fig)
 
 
 def exibir_grafo_de_arquivo(caminho: str | Path, **kwargs) -> None:
@@ -182,6 +197,7 @@ def animar_verificacao(
     mostrar: bool = True,
     caminho_saida: str | Path | None = None,
     fps: int = 1,
+    intervalo_ms: int = 1000,
 ) -> FuncAnimation:
     """Cria uma animação destacando as etapas da verificação do grafo."""
 
@@ -249,7 +265,13 @@ def animar_verificacao(
             eixo.set_title(f"{titulo} — etapa {indice + 1}/{len(passos)}")
         return colecao_vertices, colecao_arestas, texto_info
 
-    animacao = FuncAnimation(fig, atualizar, frames=len(passos), interval=1000, repeat=False)
+    animacao = FuncAnimation(
+        fig,
+        atualizar,
+        frames=len(passos),
+        interval=max(1, intervalo_ms),
+        repeat=False,
+    )
 
     if caminho_saida:
         caminho = Path(caminho_saida)

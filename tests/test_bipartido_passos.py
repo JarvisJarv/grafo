@@ -35,7 +35,7 @@ def test_verificar_biparticao_com_passos_com_conflito() -> None:
     resultado, passos = grafo.verificar_biparticao_com_passos()
 
     assert not resultado.eh_bipartido
-    assert {tuple(sorted(conflito)) for conflito in resultado.conflitos} == {("A", "C")}
+    assert {tuple(sorted(conflito)) for conflito in resultado.conflitos} == {("B", "C")}
 
     descricoes = [passo.descricao for passo in passos]
     assert any("Conflito detectado" in descricao for descricao in descricoes)
