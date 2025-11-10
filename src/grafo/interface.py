@@ -460,15 +460,17 @@ class VisualizadorBipartido(QMainWindow):
           <li>A seção <code>[vertices]</code> é opcional e permite definir atributos.
               Utilize <code>pos=x,y</code> ou <code>x=</code>/<code>y=</code> para posicionar.</li>
           <li>Na seção <code>[arestas]</code> (ou fora de qualquer seção) liste
-              dois vértices por linha representando uma relação.</li>
+              dois vértices por linha representando uma relação. Você pode usar
+              tanto <code>origem destino</code> quanto <code>origem x destino</code>
+              para destacar a ligação.</li>
           <li>O algoritmo aceita qualquer grafo bipartido, mas nos exemplos usamos
               usuários conectando-se a filmes que assistiram.</li>
         </ul>
         <p>Exemplo mínimo:</p>
         <pre># usuários à esquerda, filmes à direita
-gabriel filme_matrix
-gabriel filme_mad_max
-larissa filme_meu_vizinho_totoro</pre>
+gabriel x filme_matrix
+gabriel x filme_mad_max
+larissa x filme_meu_vizinho_totoro</pre>
         """
 
     # ------------------------------------------------------------------

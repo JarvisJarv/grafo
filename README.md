@@ -49,7 +49,8 @@ PySide6 que combina o verificador com um painel de visualização interativo.
 2. Execute `python -m grafo.interface`.
 3. Escolha um arquivo `.txt` existente ou escreva um novo arquivo na aba "Criar
    arquivo .txt". A aplicação traz exemplos prontos (como Gabriel × Filmes) e um
-   guia de formatação embutido.
+   guia de formatação embutido — as arestas podem ser escritas como
+   `usuario filme` ou `usuario x filme`.
 
 Recursos disponíveis na interface:
 

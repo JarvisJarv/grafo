@@ -117,13 +117,16 @@ def carregar_de_iteravel(linhas: Iterable[str]) -> DadosGrafo:
             continue
 
         partes = conteudo.split()
-        if len(partes) != 2:
+        if len(partes) == 3 and partes[1].lower() == "x":
+            origem, destino = partes[0], partes[2]
+        elif len(partes) == 2:
+            origem, destino = partes
+        else:
             raise ValueError(
                 "Formato inválido na linha "
-                f"{numero_linha}: esperado dois vértices separados por espaço"
+                f"{numero_linha}: use 'origem destino' ou 'origem x destino'"
             )
 
-        origem, destino = partes
         vertices.update((origem, destino))
         arestas.append((origem, destino))
 
