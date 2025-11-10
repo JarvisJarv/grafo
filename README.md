@@ -23,9 +23,10 @@ Este repositório reúne os artefatos desenvolvidos para o estudo de grafos bipa
 ## Como executar
 1. Instale as dependências: `pip install -r requirements.txt`.
 2. Escolha um arquivo de entrada em `exemplos/`. Existem variantes como `bipartido.txt`, `usuario_filme_equilibrado.txt` e `usuario_filme_tendencias.txt` (o antigo `usuario_filme_bipartido.txt` continua compatível caso esteja no seu diretório local).
-3. Rode o verificador com um arquivo de exemplo: 
+3. Rode o verificador com um arquivo de exemplo:
    - usando o módulo: `python -m src.main exemplos/bipartido.txt --plot`
-   - ou executando diretamente: `python src/main.py exemplos/bipartido.txt --plot`
+   - executando diretamente: `python src/main.py exemplos/bipartido.txt --plot`
+   - comando legado (caso esteja usando o arquivo antigo): `python -m src.main exemplos/usuario_filme_bipartido.txt --plot`
 4. Para exportar uma animação: `python -m src.main exemplos/nao_bipartido.txt --animar --exportar-animacao docs/imagens/biparticao.gif`.
 
 ## Testes automatizados
