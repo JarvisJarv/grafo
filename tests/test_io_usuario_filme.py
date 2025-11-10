@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from grafo.io import carregar_de_arquivo
+from grafo.io import carregar_de_arquivo, carregar_de_iteravel
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -44,3 +44,17 @@ def test_compatibilidade_formato_antigo():
 
     assert ("u", "v") in dados.arestas
     assert dados.posicoes == {}
+
+
+def test_formato_com_x_e_espacos():
+    linhas = [
+        "Gabriel x Moana",
+        "Larissa x Up altas aventuras",
+        "Marcelo x Gabriel",
+    ]
+
+    dados = carregar_de_iteravel(linhas)
+
+    assert ("Gabriel", "Moana") in dados.arestas
+    assert ("Larissa", "Up altas aventuras") in dados.arestas
+    assert ("Marcelo", "Gabriel") in dados.arestas

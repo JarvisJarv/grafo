@@ -1,0 +1,5 @@
+# Exemplo que apresenta um conflito (não é bipartido)
+Gabriel x Moana
+Moana x Marcelo
+Marcelo x Gabriel
+Larissa x Up altas aventuras

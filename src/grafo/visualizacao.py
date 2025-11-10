@@ -1,6 +1,8 @@
 """Rotinas de visualização de grafos usando matplotlib e networkx."""
 from __future__ import annotations
 
+import colorsys
+import hashlib
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Tuple
 
@@ -33,6 +35,35 @@ def _calcular_posicoes(grafo_nx: nx.Graph, layout: str) -> Posicoes:
     return nx.spring_layout(grafo_nx, seed=42)
 
 
+def _calcular_posicoes_bipartido(resultado: ResultadoBiparticao) -> Posicoes:
+    """Gera um layout em duas colunas para grafos bipartidos."""
+
+    particao_a, particao_b = (sorted(particao) for particao in resultado.particoes)
+    posicoes: Posicoes = {}
+
+    if not particao_a and not particao_b:
+        return posicoes
+
+    altura_a = max(len(particao_a) - 1, 1)
+    altura_b = max(len(particao_b) - 1, 1)
+
+    for indice, vertice in enumerate(particao_a):
+        if len(particao_a) <= 1:
+            y = 0.5
+        else:
+            y = 1 - indice / altura_a
+        posicoes[vertice] = (0.1, y)
+
+    for indice, vertice in enumerate(particao_b):
+        if len(particao_b) <= 1:
+            y = 0.5
+        else:
+            y = 1 - indice / altura_b
+        posicoes[vertice] = (0.9, y)
+
+    return posicoes
+
+
 def _construir_grafo_networkx(grafo: GrafoBipartido) -> nx.Graph:
     """Converte ``GrafoBipartido`` para ``networkx.Graph``."""
 
@@ -57,10 +88,70 @@ def _cores_vertices(resultado: ResultadoBiparticao) -> Dict[str, str]:
     return {vertice: cores_visuais.get(cor, "tab:gray") for vertice, cor in resultado.cores.items()}
 
 
-def _cores_arestas_lista(arestas: Iterable[Tuple[str, str]], resultado: ResultadoBiparticao) -> Iterable[str]:
+def _cor_deterministica(vertice: str, saturacao: float, brilho: float = 0.92) -> str:
+    """Gera uma cor estável a partir do identificador do vértice."""
+
+    digest = hashlib.sha1(vertice.encode("utf-8")).hexdigest()
+    valor = int(digest[:8], 16)
+    tonalidade = (valor % 360) / 360.0
+    r, g, b = colorsys.hsv_to_rgb(tonalidade, saturacao, brilho)
+    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
+
+
+def cores_relacionamentos(resultado: ResultadoBiparticao) -> Dict[str, str]:
+    """Define cores específicas para cada vértice com base na partição."""
+
+    cores: Dict[str, str] = {}
+    for vertice, cor in resultado.cores.items():
+        saturacao = 0.65 if cor == 0 else 0.55
+        cores[vertice] = _cor_deterministica(vertice, saturacao)
+    return cores
+
+
+def _particao_preferida(arestas: Sequence[Tuple[str, str]], resultado: ResultadoBiparticao) -> int:
+    contagem = {0: 0, 1: 0}
+    for origem, _ in arestas:
+        cor = resultado.cores.get(origem)
+        if cor in contagem:
+            contagem[cor] += 1
+    if contagem[0] >= contagem[1]:
+        return 0
+    return 1
+
+
+def _origem_por_aresta(
+    arestas: Sequence[Tuple[str, str]], resultado: ResultadoBiparticao, preferida: int
+) -> Dict[Tuple[str, str], str]:
+    mapa: Dict[Tuple[str, str], str] = {}
+    for origem, destino in arestas:
+        chave = tuple(sorted((origem, destino)))
+        cor_origem = resultado.cores.get(origem)
+        if cor_origem == preferida or chave not in mapa:
+            mapa[chave] = origem
+    return mapa
+
+
+def _cores_arestas_lista(
+    arestas: Iterable[Tuple[str, str]],
+    resultado: ResultadoBiparticao,
+    arestas_originais: Sequence[Tuple[str, str]],
+    cores_relacionamentos: Dict[str, str],
+) -> Iterable[str]:
     conflitos = {tuple(sorted(aresta)) for aresta in resultado.conflitos}
-    for aresta in arestas:
-        yield "red" if tuple(sorted(aresta)) in conflitos else "0.65"
+    preferida = _particao_preferida(arestas_originais, resultado)
+    origem_preferida = _origem_por_aresta(arestas_originais, resultado, preferida)
+
+    for origem, destino in arestas:
+        aresta_ordenada = tuple(sorted((origem, destino)))
+        if aresta_ordenada in conflitos:
+            yield "#e74c3c"
+            continue
+
+        preferido = origem_preferida.get(aresta_ordenada)
+        cor = cores_relacionamentos.get(preferido or origem)
+        if not cor:
+            cor = cores_relacionamentos.get(destino, "0.65")
+        yield cor
 
 
 def _cores_vertices_passo(grafo_nx: nx.Graph, passo: PassoBiparticao) -> List[str]:
@@ -104,6 +195,39 @@ def _formatar_texto_passo(passo: PassoBiparticao) -> str:
     )
 
 
+def preparar_desenho(
+    grafo: GrafoBipartido, *, layout: str = "spring"
+) -> Tuple[nx.Graph, Posicoes, List[str], List[str], ResultadoBiparticao]:
+    """Prepara os elementos necessários para desenhar um grafo."""
+
+    layout = layout.lower()
+    resultado = _obter_resultado(grafo)
+    grafo_nx = _construir_grafo_networkx(grafo)
+
+    posicoes: Posicoes = {}
+    posicoes_definidas = grafo.posicoes
+    if posicoes_definidas:
+        posicoes.update({vertice: posicoes_definidas[vertice] for vertice in grafo_nx.nodes if vertice in posicoes_definidas})
+
+    faltantes = [vertice for vertice in grafo_nx.nodes if vertice not in posicoes]
+    if faltantes:
+        if layout == "bipartido" and resultado.eh_bipartido:
+            posicoes_calculadas = _calcular_posicoes_bipartido(resultado)
+        else:
+            subgrafo = grafo_nx.subgraph(faltantes).copy()
+            posicoes_calculadas = _calcular_posicoes(subgrafo, layout)
+        posicoes.update({vertice: posicoes_calculadas.get(vertice, (0.0, 0.0)) for vertice in faltantes})
+
+    cores_por_vertice = _cores_vertices(resultado)
+    cores_vertices = [cores_por_vertice.get(vertice, "tab:gray") for vertice in grafo_nx.nodes]
+    cores_relacoes = cores_relacionamentos(resultado)
+    cores_arestas = list(
+        _cores_arestas_lista(grafo_nx.edges, resultado, grafo.arestas, cores_relacoes)
+    )
+
+    return grafo_nx, posicoes, cores_vertices, cores_arestas, resultado
+
+
 def exibir_grafo(
     grafo: GrafoBipartido,
     *,
@@ -113,37 +237,27 @@ def exibir_grafo(
     mostrar: bool = True,
     caminho_saida: str | Path | None = None,
 ) -> None:
-    """Renderiza o grafo destacando as partições e conflitos.
+    """Renderiza o grafo destacando as partições e conflitos."""
 
-    Quando ``mostrar`` é ``False`` o gráfico é apenas renderizado em memória.
-    Opcionalmente é possível salvar a figura informando ``caminho_saida``.
-    """
-
-    resultado = _obter_resultado(grafo)
-    grafo_nx = _construir_grafo_networkx(grafo)
-
-    posicoes_definidas = grafo.posicoes
-    if posicoes_definidas:
-        posicoes = {vertice: posicoes_definidas[vertice] for vertice in grafo_nx.nodes if vertice in posicoes_definidas}
-        faltantes = [vertice for vertice in grafo_nx.nodes if vertice not in posicoes]
-        if faltantes:
-            subgrafo = grafo_nx.subgraph(faltantes).copy()
-            posicoes_calculadas = _calcular_posicoes(subgrafo, layout)
-            posicoes.update(posicoes_calculadas)
-    else:
-        posicoes = _calcular_posicoes(grafo_nx, layout)
-
-    cores_vertices = _cores_vertices(resultado)
-    cores_padrao_vertices = [cores_vertices.get(vertice, "tab:gray") for vertice in grafo_nx.nodes]
-    cores_arestas = list(_cores_arestas_lista(grafo_nx.edges, resultado))
+    grafo_nx, posicoes, cores_vertices, cores_arestas, resultado = preparar_desenho(
+        grafo, layout=layout
+    )
 
     fig, eixo = plt.subplots(figsize=(8, 6))
-    nx.draw_networkx_edges(grafo_nx, posicoes, ax=eixo, edge_color=cores_arestas, width=2)
+    if layout == "bipartido" and resultado.eh_bipartido:
+        particao_a, particao_b = resultado.particoes
+        xs_a = [posicoes[vertice][0] for vertice in particao_a if vertice in posicoes]
+        xs_b = [posicoes[vertice][0] for vertice in particao_b if vertice in posicoes]
+        if xs_a and xs_b:
+            margem = 0.12
+            eixo.axvspan(min(xs_a) - margem, max(xs_a) + margem, color="#ecf5ff", alpha=0.6, zorder=0)
+            eixo.axvspan(min(xs_b) - margem, max(xs_b) + margem, color="#fff4e6", alpha=0.6, zorder=0)
+    nx.draw_networkx_edges(grafo_nx, posicoes, ax=eixo, edge_color=cores_arestas, width=2.6)
     nx.draw_networkx_nodes(
         grafo_nx,
         posicoes,
         ax=eixo,
-        node_color=cores_padrao_vertices,
+        node_color=cores_vertices,
         node_size=900,
         linewidths=1.5,
         edgecolors="black",
@@ -160,10 +274,17 @@ def exibir_grafo(
         elementos_legenda = [
             plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="tab:blue", label=f"Partição 0 ({len(particao_a)})"),
             plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="tab:orange", label=f"Partição 1 ({len(particao_b)})"),
+            plt.Line2D(
+                [0],
+                [0],
+                color="#6baed6",
+                lw=2.6,
+                label="Relacionamentos (cores variam por origem)",
+            ),
         ]
         if resultado.conflitos:
             elementos_legenda.append(
-                plt.Line2D([0], [0], color="red", lw=2, label=f"Conflitos ({len(resultado.conflitos)})")
+                plt.Line2D([0], [0], color="#e74c3c", lw=2.6, label=f"Conflitos ({len(resultado.conflitos)})")
             )
         eixo.legend(handles=elementos_legenda, loc="upper right")
 
@@ -202,18 +323,7 @@ def animar_verificacao(
     """Cria uma animação destacando as etapas da verificação do grafo."""
 
     resultado, passos = grafo.verificar_biparticao_com_passos()
-    grafo_nx = _construir_grafo_networkx(grafo)
-
-    posicoes_definidas = grafo.posicoes
-    if posicoes_definidas:
-        posicoes = {vertice: posicoes_definidas[vertice] for vertice in grafo_nx.nodes if vertice in posicoes_definidas}
-        faltantes = [vertice for vertice in grafo_nx.nodes if vertice not in posicoes]
-        if faltantes:
-            subgrafo = grafo_nx.subgraph(faltantes).copy()
-            posicoes_calculadas = _calcular_posicoes(subgrafo, layout)
-            posicoes.update(posicoes_calculadas)
-    else:
-        posicoes = _calcular_posicoes(grafo_nx, layout)
+    grafo_nx, posicoes, _, _, _ = preparar_desenho(grafo, layout=layout)
 
     fig, eixo = plt.subplots(figsize=(8, 6))
     colecao_arestas = nx.draw_networkx_edges(grafo_nx, posicoes, ax=eixo, width=2)

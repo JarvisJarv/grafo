@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from pathlib import Path
 from typing import Iterable, List, Set, Tuple
 
@@ -35,6 +36,37 @@ def carregar_de_arquivo(caminho: str | Path) -> DadosGrafo:
 
     with path.open("r", encoding="utf-8") as arquivo:
         return carregar_de_iteravel(arquivo)
+
+
+SEPARADOR_ARESTA = re.compile(r"\s*(?:x|X|->|--|:)\s*")
+
+
+def _interpretar_aresta(conteudo: str, numero_linha: int) -> Tuple[str, str]:
+    """Extrai os vértices conectados a partir de uma linha de texto."""
+
+    if not conteudo:
+        raise ValueError("Linha vazia não representa uma aresta")
+
+    partes = conteudo.split()
+    if len(partes) == 2:
+        return partes[0], partes[1]
+
+    if len(partes) >= 3 and partes[1].lower() in {"x", "--", "->", ":"}:
+        origem = partes[0]
+        destino = " ".join(partes[2:])
+        if destino:
+            return origem, destino
+
+    usando_separador = SEPARADOR_ARESTA.split(conteudo, maxsplit=1)
+    if len(usando_separador) == 2:
+        origem, destino = (parte.strip() for parte in usando_separador)
+        if origem and destino:
+            return origem, destino
+
+    raise ValueError(
+        "Formato inválido na linha "
+        f"{numero_linha}: informe dois vértices separados por espaço ou por 'x'"
+    )
 
 
 def carregar_de_iteravel(linhas: Iterable[str]) -> DadosGrafo:
@@ -116,14 +148,7 @@ def carregar_de_iteravel(linhas: Iterable[str]) -> DadosGrafo:
 
             continue
 
-        partes = conteudo.split()
-        if len(partes) != 2:
-            raise ValueError(
-                "Formato inválido na linha "
-                f"{numero_linha}: esperado dois vértices separados por espaço"
-            )
-
-        origem, destino = partes
+        origem, destino = _interpretar_aresta(conteudo, numero_linha)
         vertices.update((origem, destino))
         arestas.append((origem, destino))
 
