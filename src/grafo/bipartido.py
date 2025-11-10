@@ -47,7 +47,7 @@ class GrafoBipartido:
     """Representação de um grafo não direcionado com verificação de bipartição."""
 
     def __init__(self) -> None:
-        self._vertices: Set[str] = set()
+        self._vertices: List[str] = []
         self._arestas: List[Aresta] = []
         self._adjacencia: Dict[str, Set[str]] = {}
         self._resultado: Optional[ResultadoBiparticao] = None
@@ -76,7 +76,7 @@ class GrafoBipartido:
     def carregar(self, dados: DadosGrafo) -> None:
         """Carrega o grafo a partir de ``DadosGrafo``."""
 
-        self._vertices = set(dados.vertices)
+        self._vertices = sorted(dados.vertices)
         self._arestas = list(dados.arestas)
         self._adjacencia = {vertice: set() for vertice in self._vertices}
         self._posicoes = dict(dados.posicoes)
@@ -143,7 +143,7 @@ class GrafoBipartido:
                 cor_atual = cores[atual]
                 cor_oposta = 1 - cor_atual
 
-                for vizinho in self._adjacencia.get(atual, set()):
+                for vizinho in sorted(self._adjacencia.get(atual, set())):
                     aresta = tuple(sorted((atual, vizinho)))
                     if vizinho not in cores:
                         cores[vizinho] = cor_oposta

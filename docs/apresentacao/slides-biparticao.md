@@ -65,14 +65,14 @@ para cada vértice não visitado:
 # Visualização estática
 > **Pré-requisito**: execute `python scripts/gerar_midias.py` para materializar as mídias em `docs/imagens/`.
 
-![Visualização de um grafo bipartido colorido](imagens/visualizacao_bipartido.png)
+![Visualização de um grafo bipartido colorido](../imagens/visualizacao_bipartido.png)
 
 Legenda automática destaca partições e conflitos (se existirem).
 
 ---
 
 # Animação do processo de coloração
-![Animação do BFS identificando conflito](imagens/animacao_coloracao.gif)
+![Animação do BFS identificando conflito](../imagens/animacao_coloracao.gif)
 
 Cada quadro indica o vértice colorido ou conflito detectado durante a BFS.
 
@@ -91,5 +91,5 @@ Cada quadro indica o vértice colorido ou conflito detectado durante a BFS.
 - Visualização: `python -m src.main exemplos/nao_bipartido.txt --plot`
 - Geração de mídias: `python scripts/gerar_midias.py`
 - As imagens geradas ficam em `docs/imagens/` e são ignoradas pelo Git.
-- Documentação complementar: consulte o teste de mesa em `docs/teste-de-mesa.md`.
+- Documentação complementar: consulte o teste de mesa em `../trabalho/teste-de-mesa.md`.
 
