@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
 
 from .bipartido import GrafoBipartido, ResultadoBiparticao
 from .io import carregar_de_iteravel
-from .visualizacao import animar_verificacao, preparar_desenho
+from .visualizacao import _deslocar_rotulos, animar_verificacao, preparar_desenho
 
 
 CORES_PARTICOES = {
@@ -101,8 +101,10 @@ class VisualizadorBipartido(QMainWindow):
         self._arquivo_atual: Optional[Path] = None
         self._layout_atual: str = "flechas"
 
+        self._aplicar_tema_moderno()
         self._criar_componentes()
         self._carregar_exemplo_padrao()
+        self.setWindowState(self.windowState() | Qt.WindowMaximized)
 
     # ------------------------------------------------------------------
     # Construção da interface
@@ -119,12 +121,14 @@ class VisualizadorBipartido(QMainWindow):
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setChildrenCollapsible(False)
+        splitter.setHandleWidth(6)
 
         painel_controles = self._montar_painel_controles()
         splitter.addWidget(painel_controles)
 
         self.canvas = CanvasGrafo()
         painel_canvas = QWidget()
+        painel_canvas.setObjectName("PainelCanvas")
         layout_canvas = QVBoxLayout(painel_canvas)
         layout_canvas.setContentsMargins(12, 12, 12, 12)
         layout_canvas.addWidget(self.canvas)
@@ -137,6 +141,7 @@ class VisualizadorBipartido(QMainWindow):
 
     def _montar_painel_controles(self) -> QWidget:
         painel = QWidget()
+        painel.setObjectName("PainelControles")
         painel.setMinimumWidth(380)
         layout = QVBoxLayout(painel)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -226,6 +231,7 @@ class VisualizadorBipartido(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(painel)
+        scroll.setObjectName("ScrollPainel")
         return scroll
 
     def _criar_aba_editor(self) -> QWidget:
@@ -623,7 +629,15 @@ class VisualizadorBipartido(QMainWindow):
             linewidths=1.6,
             edgecolors="#2d2d2d",
         )
-        rotulos = nx.draw_networkx_labels(grafo_nx, posicoes, ax=ax, font_weight="bold")
+        posicoes_rotulos = _deslocar_rotulos(posicoes)
+        rotulos = nx.draw_networkx_labels(
+            grafo_nx,
+            posicoes_rotulos,
+            ax=ax,
+            font_weight="bold",
+            verticalalignment="bottom",
+            bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="none", alpha=0.85),
+        )
 
         # Ajusta a ordem de desenho para manter os elementos visuais na hierarquia correta
         if isinstance(colecao_arestas, list):
@@ -664,6 +678,104 @@ class VisualizadorBipartido(QMainWindow):
     # ------------------------------------------------------------------
     # Utilidades
     # ------------------------------------------------------------------
+    def _aplicar_tema_moderno(self) -> None:
+        estilo = dedent(
+            """
+            QMainWindow {
+                background-color: #0f172a;
+            }
+            QWidget {
+                font-family: 'Inter', 'Segoe UI', sans-serif;
+                font-size: 13px;
+                color: #e2e8f0;
+            }
+            QSplitter::handle {
+                background-color: rgba(148, 163, 184, 0.35);
+                margin: 0 6px;
+            }
+            QWidget#PainelCanvas {
+                background-color: #111c33;
+                border-radius: 16px;
+            }
+            QWidget#PainelControles {
+                background-color: rgba(15, 23, 42, 0.92);
+                border-radius: 18px;
+                border: 1px solid rgba(148, 163, 184, 0.25);
+            }
+            QScrollArea#ScrollPainel {
+                border: none;
+                background-color: transparent;
+            }
+            QScrollArea#ScrollPainel > QWidget > QWidget {
+                background: transparent;
+            }
+            QGroupBox {
+                border: 1px solid rgba(148, 163, 184, 0.35);
+                border-radius: 12px;
+                margin-top: 12px;
+                padding: 10px 14px 14px 14px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 0 6px;
+                color: #f8fafc;
+                font-weight: 600;
+            }
+            QLabel {
+                line-height: 1.4;
+            }
+            QPushButton {
+                background-color: #2563eb;
+                border: none;
+                border-radius: 10px;
+                padding: 10px 16px;
+                color: white;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background-color: #1d4ed8;
+            }
+            QPushButton:pressed {
+                background-color: #1e3a8a;
+            }
+            QPushButton:disabled {
+                background-color: rgba(37, 99, 235, 0.35);
+                color: rgba(255, 255, 255, 0.55);
+            }
+            QComboBox {
+                padding: 8px 12px;
+                border-radius: 10px;
+                background-color: rgba(30, 41, 59, 0.92);
+                border: 1px solid rgba(148, 163, 184, 0.35);
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #1f2937;
+                border-radius: 8px;
+                selection-background-color: #2563eb;
+                selection-color: white;
+            }
+            QPlainTextEdit, QTextEdit {
+                background-color: rgba(15, 23, 42, 0.85);
+                border-radius: 12px;
+                border: 1px solid rgba(148, 163, 184, 0.35);
+                padding: 12px;
+            }
+            QPlainTextEdit {
+                font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            }
+            QStatusBar {
+                background-color: rgba(15, 23, 42, 0.9);
+                border-top: 1px solid rgba(148, 163, 184, 0.35);
+            }
+            """
+        )
+        self.setStyleSheet(estilo)
+        self.statusBar().setStyleSheet("color: #e2e8f0;")
+
     def _desenhar_arestas_flechas(
         self,
         ax: "Axes",
