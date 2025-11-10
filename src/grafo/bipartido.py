@@ -1,7 +1,7 @@
 """Implementação de um grafo bipartido com verificação de coloração."""
 from __future__ import annotations
 
-from collections import deque
+from collections import Counter, deque
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
@@ -52,6 +52,7 @@ class GrafoBipartido:
         self._adjacencia: Dict[str, Set[str]] = {}
         self._resultado: Optional[ResultadoBiparticao] = None
         self._posicoes: Dict[str, Tuple[float, float]] = {}
+        self._atributos: Dict[str, Dict[str, str]] = {}
 
     @property
     def vertices(self) -> Set[str]:
@@ -78,6 +79,11 @@ class GrafoBipartido:
 
         return dict(self._posicoes)
 
+    def atributos(self) -> Dict[str, Dict[str, str]]:
+        """Retorna uma cópia dos atributos associados a cada vértice."""
+
+        return {vertice: dict(atributos) for vertice, atributos in self._atributos.items()}
+
     def carregar(self, dados: DadosGrafo) -> None:
         """Carrega o grafo a partir de ``DadosGrafo``."""
 
@@ -85,6 +91,7 @@ class GrafoBipartido:
         self._arestas = list(dados.arestas)
         self._adjacencia = {vertice: set() for vertice in self._vertices}
         self._posicoes = dict(dados.posicoes)
+        self._atributos = {vertice: dict(dados.atributos.get(vertice, {})) for vertice in self._vertices}
 
         for origem, destino in self._arestas:
             self._adjacencia.setdefault(origem, set()).add(destino)
@@ -150,6 +157,12 @@ class GrafoBipartido:
 
                 for vizinho in sorted(self._adjacencia.get(atual, set())):
                     aresta = tuple(sorted((atual, vizinho)))
+                    atributos_atual = self._atributos.get(atual, {})
+                    atributos_vizinho = self._atributos.get(vizinho, {})
+                    tipo_atual = atributos_atual.get("tipo", "").lower()
+                    tipo_vizinho = atributos_vizinho.get("tipo", "").lower()
+                    conflito_tipo = bool(tipo_atual and tipo_vizinho and tipo_atual == tipo_vizinho)
+
                     if vizinho not in cores:
                         cores[vizinho] = cor_oposta
                         fila.append(vizinho)
@@ -158,18 +171,41 @@ class GrafoBipartido:
                             vertice=atual,
                             aresta=aresta,
                         )
-                    elif cores[vizinho] == cor_atual:
-                        if aresta not in conflitos:
-                            conflitos.append(aresta)
-                        registrar(
-                            f"Conflito detectado em {atual} -- {vizinho}",
-                            vertice=atual,
-                            aresta=aresta,
-                        )
+                        if conflito_tipo:
+                            if aresta not in conflitos:
+                                conflitos.append(aresta)
+                            registrar(
+                                "Conflito de tipos detectado: "
+                                f"{atual} ({atributos_atual.get('tipo', '—')}) — "
+                                f"{vizinho} ({atributos_vizinho.get('tipo', '—')})",
+                                vertice=atual,
+                                aresta=aresta,
+                            )
                     else:
-                        registrar(
-                            f"Aresta {atual} -- {vizinho} respeita as cores", vertice=atual, aresta=aresta
-                        )
+                        conflito_biparticao = cores[vizinho] == cor_atual
+                        if conflito_biparticao or conflito_tipo:
+                            if aresta not in conflitos:
+                                conflitos.append(aresta)
+                            if conflito_tipo and not conflito_biparticao:
+                                mensagem = (
+                                    "Conflito de tipos detectado: "
+                                    f"{atual} ({atributos_atual.get('tipo', '—')}) — "
+                                    f"{vizinho} ({atributos_vizinho.get('tipo', '—')})"
+                                )
+                            elif conflito_tipo:
+                                mensagem = (
+                                    "Conflito detectado: cores iguais e tipos equivalentes em "
+                                    f"{atual} — {vizinho}"
+                                )
+                            else:
+                                mensagem = f"Conflito detectado em {atual} -- {vizinho}"
+                            registrar(mensagem, vertice=atual, aresta=aresta)
+                        else:
+                            registrar(
+                                f"Aresta {atual} -- {vizinho} respeita as cores",
+                                vertice=atual,
+                                aresta=aresta,
+                            )
 
             registrar(f"Componente iniciado em {vertice} completamente processado")
 
@@ -218,4 +254,25 @@ class GrafoBipartido:
             "particao_b": sorted(particao_b),
             "conflitos": [list(conflito) for conflito in self._resultado.conflitos],
             "posicoes": {vertice: list(posicao) for vertice, posicao in self._posicoes.items()},
+            "atributos": {vertice: dict(atributos) for vertice, atributos in self._atributos.items()},
         }
+
+    def tipos_por_particao(self) -> Dict[int, str]:
+        """Sugere rótulos para cada partição com base no atributo ``tipo``."""
+
+        if self._resultado is None:
+            self.verificar_biparticao()
+
+        assert self._resultado is not None
+
+        tipos_por_cor: Dict[int, List[str]] = {0: [], 1: []}
+        for vertice, cor in self._resultado.cores.items():
+            tipo = self._atributos.get(vertice, {}).get("tipo")
+            if tipo:
+                tipos_por_cor.setdefault(cor, []).append(tipo)
+
+        resumo: Dict[int, str] = {}
+        for cor, tipos in tipos_por_cor.items():
+            if tipos:
+                resumo[cor] = Counter(tipos).most_common(1)[0][0]
+        return resumo

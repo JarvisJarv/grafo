@@ -1,7 +1,7 @@
 """Utilitários para leitura de grafos em arquivos texto."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List, Set, Tuple
 
@@ -13,6 +13,7 @@ class DadosGrafo:
     vertices: Set[str]
     arestas: List[Tuple[str, str]]
     posicoes: dict[str, Tuple[float, float]]
+    atributos: dict[str, dict[str, str]] = field(default_factory=dict)
 
 
 def _normalizar_linha(linha: str) -> str:
@@ -59,6 +60,7 @@ def carregar_de_iteravel(linhas: Iterable[str]) -> DadosGrafo:
     vertices: Set[str] = set()
     arestas: List[Tuple[str, str]] = []
     posicoes: dict[str, Tuple[float, float]] = {}
+    atributos: dict[str, dict[str, str]] = {}
     coordenadas_parciais: dict[str, dict[str, float]] = {}
 
     secao = "arestas"
@@ -81,6 +83,7 @@ def carregar_de_iteravel(linhas: Iterable[str]) -> DadosGrafo:
             partes = conteudo.split()
             identificador = partes[0]
             vertices.add(identificador)
+            atributos.setdefault(identificador, {})
 
             for atributo in partes[1:]:
                 if "=" not in atributo:
@@ -97,6 +100,7 @@ def carregar_de_iteravel(linhas: Iterable[str]) -> DadosGrafo:
                     try:
                         x_str, y_str = valor.split(",", 1)
                         posicoes[identificador] = (float(x_str), float(y_str))
+                        atributos[identificador]["pos"] = valor
                     except ValueError as exc:  # pragma: no cover - validação simples
                         raise ValueError(
                             "Formato inválido na linha "
@@ -108,11 +112,14 @@ def carregar_de_iteravel(linhas: Iterable[str]) -> DadosGrafo:
                         coordenadas[chave] = float(valor)
                         if {"x", "y"} <= coordenadas.keys():
                             posicoes[identificador] = (coordenadas["x"], coordenadas["y"])
+                        atributos[identificador][chave] = valor
                     except ValueError as exc:  # pragma: no cover - validação simples
                         raise ValueError(
                             "Formato inválido na linha "
                             f"{numero_linha}: valores de x/y devem ser numéricos"
                         ) from exc
+                else:
+                    atributos[identificador][chave] = valor
 
             continue
 
@@ -128,6 +135,18 @@ def carregar_de_iteravel(linhas: Iterable[str]) -> DadosGrafo:
             )
 
         vertices.update((origem, destino))
+        atributos.setdefault(origem, {})
+        atributos.setdefault(destino, {})
         arestas.append((origem, destino))
 
-    return DadosGrafo(vertices=vertices, arestas=arestas, posicoes=posicoes)
+    for vertice, coordenadas in coordenadas_parciais.items():
+        if {"x", "y"} <= coordenadas.keys():
+            posicoes[vertice] = (coordenadas["x"], coordenadas["y"])
+            atributos.setdefault(vertice, {})
+            atributos[vertice]["x"] = str(coordenadas["x"])
+            atributos[vertice]["y"] = str(coordenadas["y"])
+
+    for vertice in vertices:
+        atributos.setdefault(vertice, {})
+
+    return DadosGrafo(vertices=vertices, arestas=arestas, posicoes=posicoes, atributos=atributos)

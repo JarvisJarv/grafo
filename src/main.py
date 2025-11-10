@@ -39,9 +39,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--layout",
-        choices=("spring", "circular", "kamada_kawai", "bipartido"),
+        choices=("spring", "circular", "kamada_kawai", "bipartido", "flechas"),
         default="spring",
-        help="Algoritmo de posicionamento dos vértices ao exibir o grafo",
+        help=(
+            "Algoritmo de posicionamento dos vértices ao exibir o grafo. "
+            "Use 'flechas' para destacar as partições em ovais."
+        ),
     )
     parser.add_argument(
         "--fps",

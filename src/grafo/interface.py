@@ -4,11 +4,12 @@ from __future__ import annotations
 import sys
 from io import StringIO
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence
 
 import networkx as nx
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.patches import Ellipse
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
@@ -34,10 +35,20 @@ from PySide6.QtWidgets import (
 
 from .bipartido import GrafoBipartido, ResultadoBiparticao
 from .io import carregar_de_iteravel
-from .visualizacao import preparar_desenho
+from .visualizacao import animar_verificacao, preparar_desenho
+
+
+CORES_PARTICOES = {
+    0: ("#1d4ed8", "#bfdbfe"),
+    1: ("#c2410c", "#fed7aa"),
+}
+
+if TYPE_CHECKING:  # pragma: no cover - apenas para dicas de tipo
+    from matplotlib.axes import Axes
 
 
 LAYOUT_OPCOES = {
+    "Diagrama bipartido (ovais)": "flechas",
     "Layout automático (spring)": "spring",
     "Círculo": "circular",
     "Kamada-Kawai": "kamada_kawai",
@@ -86,7 +97,7 @@ class VisualizadorBipartido(QMainWindow):
         self._grafo = GrafoBipartido()
         self._resultado: Optional[ResultadoBiparticao] = None
         self._arquivo_atual: Optional[Path] = None
-        self._layout_atual: str = "spring"
+        self._layout_atual: str = "flechas"
 
         self._criar_componentes()
         self._carregar_exemplo_padrao()
@@ -138,6 +149,9 @@ class VisualizadorBipartido(QMainWindow):
         for descricao, valor in LAYOUT_OPCOES.items():
             self.combo_layout.addItem(descricao, userData=valor)
         self.combo_layout.currentIndexChanged.connect(self._alterar_layout)
+        indice_layout_padrao = self.combo_layout.findData(self._layout_atual)
+        if indice_layout_padrao >= 0:
+            self.combo_layout.setCurrentIndex(indice_layout_padrao)
 
         botoes_layout = QWidget()
         botoes_layout_linha = QHBoxLayout(botoes_layout)
@@ -163,7 +177,19 @@ class VisualizadorBipartido(QMainWindow):
         layout_rel = QVBoxLayout(grupo_relacionamentos)
         self.texto_relacionamentos = QTextEdit()
         self.texto_relacionamentos.setReadOnly(True)
-        self.texto_relacionamentos.setStyleSheet("QTextEdit { background-color: #f3f4f6; }")
+        self.texto_relacionamentos.setMinimumHeight(220)
+        self.texto_relacionamentos.setStyleSheet(
+            "QTextEdit {"
+            " background-color: #0f172a;"
+            " color: #e2e8f0;"
+            " border-radius: 8px;"
+            " border: 1px solid #1e293b;"
+            " padding: 8px;"
+            " font-family: 'JetBrains Mono', 'Fira Code', monospace;"
+            " font-size: 13px;"
+            " line-height: 1.5;"
+            " }"
+        )
         layout_rel.addWidget(self.texto_relacionamentos)
 
         grupo_ajuda = QGroupBox("Formato do arquivo .txt")
@@ -183,7 +209,11 @@ class VisualizadorBipartido(QMainWindow):
         layout.addWidget(grupo_resumo)
         layout.addWidget(grupo_relacionamentos)
         layout.addWidget(grupo_ajuda)
+        botao_animacao = QPushButton("Ver animação do algoritmo")
+        botao_animacao.clicked.connect(self._mostrar_animacao)
+
         layout.addWidget(botao_exportar)
+        layout.addWidget(botao_animacao)
         layout.addStretch(1)
 
         scroll = QScrollArea()
@@ -260,6 +290,8 @@ class VisualizadorBipartido(QMainWindow):
             self.combo_exemplos.addItem(caminho.name, userData=caminho)
 
         preferidos = [
+            "recomendacao_sucesso.txt",
+            "recomendacao_conflito.txt",
             "usuario_filme_equilibrado.txt",
             "usuario_filme_tendencias.txt",
             "bipartido.txt",
@@ -339,6 +371,28 @@ class VisualizadorBipartido(QMainWindow):
             except Exception as exc:  # pragma: no cover - interface
                 self._mostrar_erro("Não foi possível exportar a figura", exc)
 
+    def _mostrar_animacao(self) -> None:
+        if self._resultado is None:
+            QMessageBox.information(self, "Nada para animar", "Carregue um grafo antes de assistir à animação.")
+            return
+
+        layout_animacao = "bipartido" if self._layout_atual == "flechas" else self._layout_atual
+        titulo = "Execução passo a passo do algoritmo"
+        if self._arquivo_atual:
+            titulo += f" — {self._arquivo_atual.name}"
+
+        try:
+            animar_verificacao(
+                self._grafo,
+                layout=layout_animacao,
+                titulo=titulo,
+                mostrar=True,
+            )
+        except RuntimeError as exc:  # pragma: no cover - interface
+            self._mostrar_erro("Não foi possível exibir a animação", exc)
+        except Exception as exc:  # pragma: no cover - interface
+            self._mostrar_erro("Falha inesperada ao abrir a animação", exc)
+
     # ------------------------------------------------------------------
     # Atualização de conteúdo
     # ------------------------------------------------------------------
@@ -379,14 +433,52 @@ class VisualizadorBipartido(QMainWindow):
         assert self._resultado is not None
         adjacencias = self._grafo.adjacencias()
         cores = self._resultado.cores
+        atributos = self._grafo.atributos()
+        tipos_particoes = self._grafo.tipos_por_particao()
+        conflitos = {tuple(sorted(aresta)) for aresta in self._resultado.conflitos}
 
-        simbolos = {0: "🟦", 1: "🟧"}
-        linhas = []
+        linhas: List[str] = []
         for vertice in sorted(adjacencias.keys()):
-            vizinhos = ", ".join(sorted(adjacencias[vertice])) or "nenhuma conexão"
-            marcador = simbolos.get(cores.get(vertice, -1), "⬜")
-            linhas.append(f"{marcador} <b>{vertice}</b> → {vizinhos}")
-        self.texto_relacionamentos.setHtml("<br>".join(linhas))
+            cor_vertice = cores.get(vertice, -1)
+            dados_vertice = atributos.get(vertice, {})
+            tipo = dados_vertice.get("tipo") or tipos_particoes.get(cor_vertice)
+            if tipo:
+                etiqueta = tipo.replace("_", " ").title()
+            elif cor_vertice in (0, 1):
+                etiqueta = f"Partição {cor_vertice}"
+            else:
+                etiqueta = "Sem partição"
+
+            tag_classe = f"tag-{cor_vertice}" if cor_vertice in (0, 1) else "tag--1"
+
+            vizinhos = []
+            for vizinho in sorted(adjacencias[vertice]):
+                aresta = tuple(sorted((vertice, vizinho)))
+                classe = "conflito" if aresta in conflitos else "vizinho"
+                vizinhos.append(f"<span class='{classe}'>{vizinho}</span>")
+
+            if vizinhos:
+                destinos = ", ".join(vizinhos)
+            else:
+                destinos = "<span class='vazio'>sem conexões</span>"
+
+            linhas.append(
+                "<div class='linha'>"
+                f"<span class='tag {tag_classe}'>{etiqueta}</span>"
+                f"<span class='nome'>{vertice}</span>"
+                "<span class='seta'>→</span>"
+                f"<span class='destinos'>{destinos}</span>"
+                "</div>"
+            )
+
+        html = (
+            "<html><head>"
+            f"{self._estilos_relacionamentos()}"
+            "</head><body><div class='lista'>"
+            + "".join(linhas)
+            + "</div></body></html>"
+        )
+        self.texto_relacionamentos.setHtml(html)
 
     def _desenhar_grafo(self) -> None:
         if self._resultado is None:
@@ -403,9 +495,13 @@ class VisualizadorBipartido(QMainWindow):
 
         self.canvas.figure.clear()
         ax = self.canvas.figure.add_subplot(111)
-        ax.set_facecolor("#f7f8fb")
+        if self._layout_atual == "flechas":
+            ax.set_facecolor("#0b1120")
+            self._desenhar_regioes_particao(ax, posicoes, resultado)
+        else:
+            ax.set_facecolor("#f7f8fb")
 
-        nx.draw_networkx_edges(grafo_nx, posicoes, ax=ax, edge_color=cores_arestas, width=2.4)
+        nx.draw_networkx_edges(grafo_nx, posicoes, ax=ax, edge_color=cores_arestas, width=2.4, zorder=1)
         nx.draw_networkx_nodes(
             grafo_nx,
             posicoes,
@@ -414,8 +510,9 @@ class VisualizadorBipartido(QMainWindow):
             node_size=1100,
             linewidths=1.6,
             edgecolors="#2d2d2d",
+            zorder=2,
         )
-        nx.draw_networkx_labels(grafo_nx, posicoes, ax=ax, font_weight="bold")
+        nx.draw_networkx_labels(grafo_nx, posicoes, ax=ax, font_weight="bold", zorder=3)
 
         ax.set_axis_off()
         titulo = "Resultado do algoritmo"
@@ -445,6 +542,63 @@ class VisualizadorBipartido(QMainWindow):
     # ------------------------------------------------------------------
     # Utilidades
     # ------------------------------------------------------------------
+    def _desenhar_regioes_particao(
+        self,
+        ax: "Axes",
+        posicoes: Dict[str, Sequence[float]],
+        resultado: ResultadoBiparticao,
+    ) -> None:
+        tipos_particoes = self._grafo.tipos_por_particao()
+
+        for indice, vertices in enumerate(resultado.particoes):
+            pontos = [posicoes[vertice] for vertice in vertices if vertice in posicoes]
+            if not pontos:
+                continue
+
+            xs = [ponto[0] for ponto in pontos]
+            ys = [ponto[1] for ponto in pontos]
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+            padding_x = max(0.12, (max_x - min_x) * 0.45)
+            padding_y = max(0.12, (max_y - min_y) * 0.55)
+
+            centro_x = (min_x + max_x) / 2
+            centro_y = (min_y + max_y) / 2
+            largura = (max_x - min_x) + 2 * padding_x
+            altura = (max_y - min_y) + 2 * padding_y
+
+            cor_borda, cor_preenchimento = CORES_PARTICOES.get(indice, ("#334155", "#cbd5f5"))
+            ellipse = Ellipse(
+                (centro_x, centro_y),
+                width=largura,
+                height=altura,
+                facecolor=cor_preenchimento,
+                edgecolor=cor_borda,
+                linewidth=2.4,
+                alpha=0.22,
+                zorder=0,
+            )
+            ax.add_patch(ellipse)
+
+            rotulo = tipos_particoes.get(indice)
+            if rotulo:
+                texto = rotulo.replace("_", " ").title()
+            else:
+                texto = f"Partição {indice}"
+
+            ax.text(
+                centro_x,
+                centro_y + altura / 2.15,
+                texto,
+                ha="center",
+                va="bottom",
+                color=cor_borda,
+                fontsize=12,
+                fontweight="bold",
+                alpha=0.85,
+                zorder=1,
+            )
+
     def _mostrar_erro(self, titulo: str, erro: Exception) -> None:
         QMessageBox.critical(self, titulo, f"{titulo}:\n{erro}")
 
@@ -472,6 +626,32 @@ gabriel x filme_matrix
 gabriel x filme_mad_max
 larissa x filme_meu_vizinho_totoro</pre>
         """
+
+    @staticmethod
+    def _estilos_relacionamentos() -> str:
+        return (
+            "<style>"
+            "body {margin: 0; background-color: transparent; color: #e2e8f0;}"
+            ".lista {display: flex; flex-direction: column; gap: 0;}"
+            ".linha {display: flex; gap: 8px; align-items: baseline; padding: 6px 4px;"
+            " border-bottom: 1px solid rgba(148, 163, 184, 0.18);}"
+            ".linha:last-child {border-bottom: none;}"
+            ".tag {padding: 2px 10px; border-radius: 999px; font-size: 11px; letter-spacing: 0.05em;"
+            " font-weight: 600; text-transform: uppercase;}"
+            ".tag-0 {background-color: rgba(29, 78, 216, 0.25); color: #bfdbfe;"
+            " border: 1px solid rgba(59, 130, 246, 0.35);}"
+            ".tag-1 {background-color: rgba(194, 65, 12, 0.25); color: #fed7aa;"
+            " border: 1px solid rgba(234, 88, 12, 0.35);}"
+            ".tag--1 {background-color: rgba(148, 163, 184, 0.2); color: #e2e8f0;"
+            " border: 1px solid rgba(148, 163, 184, 0.25);}"
+            ".nome {font-weight: 700;}"
+            ".seta {color: #94a3b8;}"
+            ".destinos {flex: 1;}"
+            ".vizinho {color: #bae6fd; font-weight: 600;}"
+            ".conflito {color: #f87171; font-weight: 700;}"
+            ".vazio {color: #64748b; font-style: italic;}"
+            "</style>"
+        )
 
     # ------------------------------------------------------------------
     # Eventos

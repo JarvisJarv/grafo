@@ -5,6 +5,13 @@ Dois arquivos de exemplo estão disponíveis em `exemplos/usuario_filme_equilibr
 usuários e filmes com características distintas (preferências complementares e gostos
 populares concentrados, respectivamente).
 
+Para facilitar a apresentação do algoritmo, a pasta `exemplos/` também contém um par
+focado na narrativa "deu certo" × "deu errado":
+
+- `recomendacao_sucesso.txt`: ligações corretas entre pessoas e filmes.
+- `recomendacao_conflito.txt`: inclui uma conexão pessoa–pessoa, gerando um conflito
+  explícito detectado pela interface e pela CLI.
+
 ## Formato do arquivo
 
 Cada arquivo segue um formato textual dividido em duas seções:

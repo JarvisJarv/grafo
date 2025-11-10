@@ -139,6 +139,7 @@ def preparar_desenho(
     """Prepara os elementos necessários para desenhar um grafo."""
 
     layout = layout.lower()
+    layout_calculo = "bipartido" if layout in {"bipartido", "flechas"} else layout
     resultado = _obter_resultado(grafo)
     grafo_nx = _construir_grafo_networkx(grafo)
 
@@ -149,11 +150,11 @@ def preparar_desenho(
 
     faltantes = [vertice for vertice in grafo_nx.nodes if vertice not in posicoes]
     if faltantes:
-        if layout == "bipartido" and resultado.eh_bipartido:
+        if layout_calculo == "bipartido" and resultado.eh_bipartido:
             posicoes_calculadas = _calcular_posicoes_bipartido(resultado)
         else:
             subgrafo = grafo_nx.subgraph(faltantes).copy()
-            posicoes_calculadas = _calcular_posicoes(subgrafo, layout)
+            posicoes_calculadas = _calcular_posicoes(subgrafo, layout_calculo)
         posicoes.update({vertice: posicoes_calculadas.get(vertice, (0.0, 0.0)) for vertice in faltantes})
 
     cores_por_vertice = _cores_vertices(resultado)

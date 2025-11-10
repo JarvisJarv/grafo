@@ -100,7 +100,7 @@ Isso cria `docs/imagens/visualizacao_bipartido.png` e `docs/imagens/animacao_col
 ## 4. Arquivos texto para gerar grafos
 
 **Onde está:**
-- Exemplos prontos: `exemplos/` (`bipartido.txt`, `nao_bipartido.txt`, `usuario_filme_equilibrado.txt`, `usuario_filme_tendencias.txt`, etc.).
+- Exemplos prontos: `exemplos/` (`bipartido.txt`, `nao_bipartido.txt`, `usuario_filme_equilibrado.txt`, `usuario_filme_tendencias.txt`, `recomendacao_sucesso.txt`, `recomendacao_conflito.txt`, etc.).
 - Documentação do formato: `docs/trabalho/usuario-filme-datasets.md`.
 
 **Como criar e validar um novo arquivo:**

@@ -25,6 +25,8 @@ def test_carregar_usuario_filme_equilibrado():
     assert len(dados.arestas) == 6
     assert dados.posicoes["usuaria_ana"] == (0.15, 0.85)
     assert dados.posicoes["filme_up"] == (0.80, 0.15)
+    assert dados.atributos["usuaria_ana"]["tipo"] == "usuario"
+    assert dados.atributos["filme_up"]["tipo"] == "filme"
 
 
 def test_carregar_usuario_filme_tendencias():
@@ -37,6 +39,7 @@ def test_carregar_usuario_filme_tendencias():
     assert dados.posicoes["filme_amor_em_paris"] == pytest.approx((0.82, 0.46))
     # Vértice sem posição explícita não deve aparecer no mapeamento
     assert "usuario_fred" not in dados.posicoes
+    assert dados.atributos["usuario_duda"]["tipo"] == "usuario"
 
 
 def test_compatibilidade_formato_antigo():
@@ -57,3 +60,13 @@ def test_formato_com_separador_x():
 
     assert {"gabriel", "larissa", "marcelo", "moana", "frozen"} <= dados.vertices
     assert ("gabriel", "moana") in dados.arestas
+    assert dados.atributos["gabriel"] == {}
+
+
+def test_arquivos_recomendacao_disponiveis():
+    sucesso = carregar_de_arquivo(caminho("recomendacao_sucesso.txt"))
+    conflito = carregar_de_arquivo(caminho("recomendacao_conflito.txt"))
+
+    assert sucesso.atributos["Gabriel"]["tipo"] == "pessoa"
+    assert sucesso.atributos["Moana"]["tipo"] == "filme"
+    assert set(conflito.arestas) != set(sucesso.arestas)
