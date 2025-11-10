@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+from collections import Counter
 from io import StringIO
 from pathlib import Path
 from textwrap import dedent
@@ -10,7 +11,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence
 import networkx as nx
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from matplotlib.patches import Ellipse
+from matplotlib.patches import Ellipse, FancyArrowPatch
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
@@ -49,7 +50,7 @@ if TYPE_CHECKING:  # pragma: no cover - apenas para dicas de tipo
 
 
 LAYOUT_OPCOES = {
-    "Diagrama bipartido (ovais)": "flechas",
+    "Diagrama bipartido (flechas)": "flechas",
     "Layout automático (spring)": "spring",
     "Círculo": "circular",
     "Kamada-Kawai": "kamada_kawai",
@@ -443,7 +444,18 @@ class VisualizadorBipartido(QMainWindow):
         tipos_particoes = self._grafo.tipos_por_particao()
         conflitos = {tuple(sorted(aresta)) for aresta in self._resultado.conflitos}
 
-        linhas: List[str] = []
+        if not adjacencias:
+            html_vazio = (
+                "<html><head>"
+                f"{self._estilos_relacionamentos()}"
+                "</head><body><div class='painel vazio'>"
+                "<p class='mensagem-vazia'>Nenhum relacionamento disponível.</p>"
+                "</div></body></html>"
+            )
+            self.texto_relacionamentos.setHtml(html_vazio)
+            return
+
+        grupos: Dict[str, Dict[str, object]] = {}
         for vertice in sorted(adjacencias.keys()):
             cor_vertice = cores.get(vertice, -1)
             dados_vertice = atributos.get(vertice, {})
@@ -455,35 +467,116 @@ class VisualizadorBipartido(QMainWindow):
             else:
                 etiqueta = "Sem partição"
 
+            chave_grupo = str(cor_vertice) if cor_vertice in (0, 1) else "sem"
+            info = grupos.setdefault(
+                chave_grupo,
+                {
+                    "cor": cor_vertice if cor_vertice in (0, 1) else -1,
+                    "vertices": [],
+                    "tipos": Counter(),
+                    "relacoes": 0,
+                },
+            )
+
+            if tipo:
+                info["tipos"][tipo] += 1
+
             tag_classe = f"tag-{cor_vertice}" if cor_vertice in (0, 1) else "tag--1"
 
-            vizinhos: List[str] = []
+            vizinhos_markup: List[str] = []
             for vizinho in sorted(adjacencias[vertice]):
                 aresta = tuple(sorted((vertice, vizinho)))
                 classe = "chip conflito" if aresta in conflitos else "chip vizinho"
-                vizinhos.append(f"<span class='{classe}'>{vizinho}</span>")
+                vizinhos_markup.append(f"<span class='{classe}'>{vizinho}</span>")
 
-            if vizinhos:
-                destinos = "<div class='chips'>" + "".join(vizinhos) + "</div>"
+            if vizinhos_markup:
+                destinos_html = "".join(vizinhos_markup)
+                resumo_cartao = f"{len(vizinhos_markup)} relação{'es' if len(vizinhos_markup) != 1 else ''}"
             else:
-                destinos = "<span class='chip vazio'>Sem conexões</span>"
+                destinos_html = "<span class='chip vazio'>Sem conexões</span>"
+                resumo_cartao = "Nenhuma relação registrada"
 
-            linhas.append(
-                "<div class='linha'>"
-                "<div class='coluna coluna-origem'>"
+            info["relacoes"] += len(vizinhos_markup)
+
+            card_html = (
+                "<article class='cartao'>"
+                "<header class='cartao-topo'>"
+                f"<span class='cartao-nome'>{vertice}</span>"
                 f"<span class='tag {tag_classe}'>{etiqueta}</span>"
-                f"<span class='nome'>{vertice}</span>"
+                "</header>"
+                "<div class='cartao-conexoes'>"
+                "<span class='cartao-seta'>➜</span>"
+                f"<div class='cartao-destinos'>{destinos_html}</div>"
                 "</div>"
-                "<div class='coluna coluna-separador'>→</div>"
-                f"<div class='coluna coluna-destinos'>{destinos}</div>"
-                "</div>"
+                f"<footer class='cartao-rodape'>{resumo_cartao}</footer>"
+                "</article>"
             )
+
+            info["vertices"].append(card_html)
+
+        secoes: List[str] = []
+        for chave in ("0", "1", "sem"):
+            info = grupos.get(chave)
+            if not info:
+                continue
+
+            cor_grupo = int(info["cor"]) if isinstance(info["cor"], int) else -1
+            total_vertices = len(info["vertices"])
+            total_relacoes = int(info["relacoes"])
+            resumo_itens = [
+                f"{total_vertices} vértice{'s' if total_vertices != 1 else ''}",
+                (
+                    f"{total_relacoes} relação{'es' if total_relacoes != 1 else ''}"
+                    if total_relacoes
+                    else "Nenhuma relação"
+                ),
+            ]
+            resumo_texto = " • ".join(resumo_itens)
+
+            if cor_grupo in (0, 1):
+                titulo = f"Partição {cor_grupo}"
+                rotulo_base = tipos_particoes.get(cor_grupo)
+                if not rotulo_base and isinstance(info["tipos"], Counter) and info["tipos"]:
+                    rotulo_base = info["tipos"].most_common(1)[0][0]
+                descricao = (
+                    rotulo_base.replace("_", " ").title()
+                    if rotulo_base
+                    else "Sem rótulo definido"
+                )
+                classe_grupo = f"grupo grupo-{cor_grupo}"
+            else:
+                titulo = "Sem partição"
+                if isinstance(info["tipos"], Counter) and info["tipos"]:
+                    descricoes = {
+                        chave_tipo.replace("_", " ").title()
+                        for chave_tipo in info["tipos"].keys()
+                    }
+                    descricao = ", ".join(sorted(descricoes))
+                else:
+                    descricao = "Vértices não classificados"
+                classe_grupo = "grupo grupo-outros"
+
+            grupo_html = (
+                f"<section class='{classe_grupo}'>"
+                "<header class='grupo-cabecalho'>"
+                "<div class='grupo-identificacao'>"
+                f"<span class='grupo-etiqueta'>{titulo}</span>"
+                f"<span class='grupo-descricao'>{descricao}</span>"
+                "</div>"
+                f"<span class='grupo-resumo'>{resumo_texto}</span>"
+                "</header>"
+                "<div class='cartoes'>"
+                + "".join(info["vertices"])
+                + "</div>"
+                "</section>"
+            )
+            secoes.append(grupo_html)
 
         html = (
             "<html><head>"
             f"{self._estilos_relacionamentos()}"
-            "</head><body><div class='lista'>"
-            + "".join(linhas)
+            "</head><body><div class='painel'>"
+            + "".join(secoes)
             + "</div></body></html>"
         )
         self.texto_relacionamentos.setHtml(html)
@@ -504,18 +597,18 @@ class VisualizadorBipartido(QMainWindow):
         self.canvas.figure.clear()
         ax = self.canvas.figure.add_subplot(111)
         if self._layout_atual == "flechas":
-            ax.set_facecolor("#0b1120")
+            ax.set_facecolor("#f8fafc")
             self._desenhar_regioes_particao(ax, posicoes, resultado)
+            colecao_arestas = self._desenhar_arestas_flechas(ax, grafo_nx, posicoes, cores_arestas)
         else:
             ax.set_facecolor("#f7f8fb")
-
-        colecao_arestas = nx.draw_networkx_edges(
-            grafo_nx,
-            posicoes,
-            ax=ax,
-            edge_color=cores_arestas,
-            width=2.4,
-        )
+            colecao_arestas = nx.draw_networkx_edges(
+                grafo_nx,
+                posicoes,
+                ax=ax,
+                edge_color=cores_arestas,
+                width=2.4,
+            )
         colecao_vertices = nx.draw_networkx_nodes(
             grafo_nx,
             posicoes,
@@ -528,7 +621,10 @@ class VisualizadorBipartido(QMainWindow):
         rotulos = nx.draw_networkx_labels(grafo_nx, posicoes, ax=ax, font_weight="bold")
 
         # Ajusta a ordem de desenho para manter os elementos visuais na hierarquia correta
-        if colecao_arestas is not None:
+        if isinstance(colecao_arestas, list):
+            for artista in colecao_arestas:
+                artista.set_zorder(1)
+        elif colecao_arestas is not None:
             colecao_arestas.set_zorder(1)
         if colecao_vertices is not None:
             colecao_vertices.set_zorder(2)
@@ -563,6 +659,47 @@ class VisualizadorBipartido(QMainWindow):
     # ------------------------------------------------------------------
     # Utilidades
     # ------------------------------------------------------------------
+    def _desenhar_arestas_flechas(
+        self,
+        ax: "Axes",
+        grafo_nx: nx.Graph,
+        posicoes: Dict[str, Sequence[float]],
+        cores_arestas: Sequence[str],
+    ) -> List[FancyArrowPatch]:
+        flechas: List[FancyArrowPatch] = []
+        arestas = list(grafo_nx.edges)
+        for (origem, destino), cor in zip(arestas, cores_arestas):
+            if origem not in posicoes or destino not in posicoes:
+                continue
+
+            inicio = posicoes[origem]
+            fim = posicoes[destino]
+            if inicio == fim:
+                continue
+
+            x1, y1 = inicio
+            x2, y2 = fim
+            if x1 > x2 or (x1 == x2 and y1 > y2):
+                inicio, fim = fim, inicio
+
+            flecha = FancyArrowPatch(
+                inicio,
+                fim,
+                arrowstyle="-|>",
+                mutation_scale=26,
+                linewidth=2.6,
+                color=cor,
+                alpha=0.95,
+                connectionstyle="arc3,rad=0.0",
+                shrinkA=18,
+                shrinkB=18,
+            )
+            flecha.set_zorder(1)
+            ax.add_patch(flecha)
+            flechas.append(flecha)
+
+        return flechas
+
     def _desenhar_regioes_particao(
         self,
         ax: "Axes",
@@ -653,35 +790,55 @@ larissa x filme_meu_vizinho_totoro</pre>
         estilos = dedent(
             """
             <style>
-            body {margin: 0; background-color: transparent; color: #e2e8f0; font-family: 'JetBrains Mono', 'Fira Code', monospace;}
-            .lista {display: flex; flex-direction: column; gap: 6px;}
-            .linha {display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 2fr); gap: 12px; align-items: center;
-                    padding: 10px 12px; background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(148, 163, 184, 0.25);
-                    border-radius: 12px; box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);}
-            .coluna {display: flex; flex-direction: column; gap: 6px; min-width: 0;}
-            .coluna-origem {gap: 4px;}
-            .coluna-separador {font-size: 18px; color: #38bdf8; justify-content: center; align-items: center; display: flex;}
-            .coluna-destinos {gap: 6px;}
-            .tag {padding: 2px 12px; border-radius: 999px; font-size: 11px; letter-spacing: 0.08em;
-                   font-weight: 600; text-transform: uppercase; align-self: flex-start;}
-            .tag-0 {background-color: rgba(29, 78, 216, 0.22); color: #bfdbfe; border: 1px solid rgba(59, 130, 246, 0.35);}
-            .tag-1 {background-color: rgba(194, 65, 12, 0.24); color: #fed7aa; border: 1px solid rgba(234, 88, 12, 0.32);}
-            .tag--1 {background-color: rgba(148, 163, 184, 0.28); color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.32);}
-            .nome {font-weight: 700; font-size: 15px; word-break: break-word;}
-            .chips {display: flex; flex-wrap: wrap; gap: 8px;}
+            body {margin: 0; background-color: transparent; color: #e2e8f0; font-family: 'Inter', 'Segoe UI', sans-serif;}
+            .painel {display: flex; flex-direction: column; gap: 18px; padding: 6px 0 18px;}
+            .painel.vazio {min-height: 160px; align-items: center; justify-content: center;}
+            .mensagem-vazia {margin: 0; padding: 18px 24px; border-radius: 14px; background: rgba(15, 23, 42, 0.68);
+                             border: 1px solid rgba(148, 163, 184, 0.3); font-weight: 600; letter-spacing: 0.04em;}
+            .grupo {display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; border-radius: 18px;
+                    border: 1px solid rgba(148, 163, 184, 0.28); background: rgba(15, 23, 42, 0.72);
+                    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.28);}
+            .grupo-0 {border-color: rgba(59, 130, 246, 0.35); box-shadow: 0 16px 32px rgba(37, 99, 235, 0.18);}
+            .grupo-1 {border-color: rgba(234, 88, 12, 0.35); box-shadow: 0 16px 32px rgba(194, 65, 12, 0.18);}
+            .grupo-cabecalho {display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;
+                              border-bottom: 1px solid rgba(148, 163, 184, 0.26); padding-bottom: 12px;}
+            .grupo-identificacao {display: flex; flex-direction: column; gap: 4px;}
+            .grupo-etiqueta {font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; color: #38bdf8;}
+            .grupo.grupo-1 .grupo-etiqueta {color: #fb923c;}
+            .grupo.grupo-outros .grupo-etiqueta {color: #cbd5f5;}
+            .grupo-descricao {font-size: 18px; font-weight: 600; color: #f8fafc;}
+            .grupo-resumo {font-size: 13px; font-weight: 600; color: #cbd5f5; background: rgba(15, 23, 42, 0.55);
+                          border-radius: 999px; padding: 4px 14px; border: 1px solid rgba(148, 163, 184, 0.32);}
+            .cartoes {display: flex; flex-direction: column; gap: 12px;}
+            .cartao {display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 16px; border-radius: 14px;
+                     background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(100, 116, 139, 0.4);
+                     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);}
+            .cartao-topo {display: flex; justify-content: space-between; align-items: center; gap: 12px;}
+            .cartao-nome {font-size: 16px; font-weight: 700; color: #f8fafc; word-break: break-word;}
+            .tag {padding: 4px 14px; border-radius: 999px; font-size: 11px; letter-spacing: 0.08em; font-weight: 600;
+                   text-transform: uppercase;}
+            .tag-0 {background-color: rgba(37, 99, 235, 0.22); color: #bfdbfe; border: 1px solid rgba(59, 130, 246, 0.4);}
+            .tag-1 {background-color: rgba(217, 119, 6, 0.24); color: #fed7aa; border: 1px solid rgba(251, 191, 36, 0.35);}
+            .tag--1 {background-color: rgba(148, 163, 184, 0.25); color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.35);}
+            .cartao-conexoes {display: flex; align-items: flex-start; gap: 12px;}
+            .cartao-seta {font-size: 20px; line-height: 1; color: #38bdf8; padding-top: 2px;}
+            .grupo.grupo-1 .cartao-seta {color: #fb923c;}
+            .cartao-destinos {display: flex; flex-wrap: wrap; gap: 8px;}
             .chip {display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 12px;
-                   background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.25); color: #e2e8f0;
+                   background: rgba(148, 163, 184, 0.14); border: 1px solid rgba(148, 163, 184, 0.32); color: #e2e8f0;
                    transition: background 0.2s ease, transform 0.2s ease;}
             .chip::before {content: '•'; font-size: 16px; opacity: 0.6;}
-            .chip:hover {transform: translateY(-1px); background: rgba(148, 163, 184, 0.2);}
+            .chip:hover {transform: translateY(-1px); background: rgba(148, 163, 184, 0.24);}
             .chip.vizinho {background: rgba(14, 165, 233, 0.22); border-color: rgba(56, 189, 248, 0.35); color: #bae6fd;}
             .chip.vizinho::before {color: #38bdf8;}
-            .chip.conflito {background: rgba(248, 113, 113, 0.22); border-color: rgba(248, 113, 113, 0.35); color: #fecaca; font-weight: 600;}
+            .chip.conflito {background: rgba(248, 113, 113, 0.24); border-color: rgba(248, 113, 113, 0.45); color: #fecaca; font-weight: 600;}
             .chip.conflito::before {color: #f87171; content: '⚠'; font-size: 14px; opacity: 1;}
-            .chip.vazio {background: rgba(100, 116, 139, 0.18); border-style: dashed; color: #cbd5f5; font-style: italic;}
+            .chip.vazio {background: rgba(100, 116, 139, 0.24); border-style: dashed; color: #cbd5f5; font-style: italic;}
+            .cartao-rodape {font-size: 12px; color: #94a3b8;}
             @media (max-width: 720px) {
-              .linha {grid-template-columns: 1fr; gap: 10px;}
-              .coluna-separador {display: none;}
+              .grupo {padding: 16px;}
+              .cartao {padding: 12px 14px;}
+              .cartao-topo {align-items: flex-start; flex-direction: column;}
             }
             </style>
             """

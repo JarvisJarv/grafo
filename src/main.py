@@ -43,7 +43,7 @@ def main() -> None:
         default="spring",
         help=(
             "Algoritmo de posicionamento dos vértices ao exibir o grafo. "
-            "Use 'flechas' para destacar as partições em ovais."
+            "Use 'flechas' para gerar colunas com setas indicando as conexões."
         ),
     )
     parser.add_argument(
