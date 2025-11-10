@@ -180,6 +180,7 @@ def exibir_grafo(
     )
 
     fig, eixo = plt.subplots(figsize=(8, 6))
+    fig.patch.set_facecolor("#f8fafc")
     nx.draw_networkx_edges(grafo_nx, posicoes, ax=eixo, edge_color=cores_arestas, width=2)
     nx.draw_networkx_nodes(
         grafo_nx,
@@ -247,6 +248,7 @@ def animar_verificacao(
     grafo_nx, posicoes, _, _, _ = preparar_desenho(grafo, layout=layout)
 
     fig, eixo = plt.subplots(figsize=(8, 6))
+    fig.patch.set_facecolor("#f8fafc")
     colecao_arestas = nx.draw_networkx_edges(grafo_nx, posicoes, ax=eixo, width=2)
     colecao_vertices = nx.draw_networkx_nodes(
         grafo_nx,
@@ -303,6 +305,7 @@ def animar_verificacao(
         interval=max(1, intervalo_ms),
         repeat=False,
     )
+    setattr(fig, "_animacao_ref", animacao)
 
     if caminho_saida:
         caminho = Path(caminho_saida)

@@ -6,7 +6,7 @@ from collections import Counter
 from io import StringIO
 from pathlib import Path
 from textwrap import dedent
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import networkx as nx
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -481,7 +481,7 @@ class VisualizadorBipartido(QMainWindow):
             if tipo:
                 info["tipos"][tipo] += 1
 
-            tag_classe = f"tag-{cor_vertice}" if cor_vertice in (0, 1) else "tag--1"
+            tag_modificador = f"tag-{cor_vertice}" if cor_vertice in (0, 1) else "tag--1"
 
             vizinhos_markup: List[str] = []
             for vizinho in sorted(adjacencias[vertice]):
@@ -500,15 +500,15 @@ class VisualizadorBipartido(QMainWindow):
 
             card_html = (
                 "<article class='cartao'>"
-                "<header class='cartao-topo'>"
+                "<div class='cartao-cabecalho'>"
                 f"<span class='cartao-nome'>{vertice}</span>"
-                f"<span class='tag {tag_classe}'>{etiqueta}</span>"
-                "</header>"
-                "<div class='cartao-conexoes'>"
-                "<span class='cartao-seta'>➜</span>"
+                f"<span class='cartao-tag {tag_modificador}'>{etiqueta}</span>"
+                "</div>"
+                "<div class='cartao-corpo'>"
+                "<span class='cartao-seta' aria-hidden='true'>→</span>"
                 f"<div class='cartao-destinos'>{destinos_html}</div>"
                 "</div>"
-                f"<footer class='cartao-rodape'>{resumo_cartao}</footer>"
+                f"<div class='cartao-rodape'>{resumo_cartao}</div>"
                 "</article>"
             )
 
@@ -559,7 +559,7 @@ class VisualizadorBipartido(QMainWindow):
             grupo_html = (
                 f"<section class='{classe_grupo}'>"
                 "<header class='grupo-cabecalho'>"
-                "<div class='grupo-identificacao'>"
+                "<div class='grupo-info'>"
                 f"<span class='grupo-etiqueta'>{titulo}</span>"
                 f"<span class='grupo-descricao'>{descricao}</span>"
                 "</div>"
@@ -599,7 +599,12 @@ class VisualizadorBipartido(QMainWindow):
         if self._layout_atual == "flechas":
             ax.set_facecolor("#f8fafc")
             self._desenhar_regioes_particao(ax, posicoes, resultado)
-            colecao_arestas = self._desenhar_arestas_flechas(ax, grafo_nx, posicoes, cores_arestas)
+            orientacoes = {
+                tuple(sorted(aresta)): aresta for aresta in self._grafo.arestas
+            }
+            colecao_arestas = self._desenhar_arestas_flechas(
+                ax, grafo_nx, posicoes, cores_arestas, orientacoes
+            )
         else:
             ax.set_facecolor("#f7f8fb")
             colecao_arestas = nx.draw_networkx_edges(
@@ -665,22 +670,23 @@ class VisualizadorBipartido(QMainWindow):
         grafo_nx: nx.Graph,
         posicoes: Dict[str, Sequence[float]],
         cores_arestas: Sequence[str],
+        orientacoes: Dict[Tuple[str, str], Tuple[str, str]] | None = None,
     ) -> List[FancyArrowPatch]:
         flechas: List[FancyArrowPatch] = []
         arestas = list(grafo_nx.edges)
         for (origem, destino), cor in zip(arestas, cores_arestas):
-            if origem not in posicoes or destino not in posicoes:
+            chave = tuple(sorted((origem, destino)))
+            origem_real, destino_real = (
+                orientacoes.get(chave, (origem, destino)) if orientacoes else (origem, destino)
+            )
+
+            if origem_real not in posicoes or destino_real not in posicoes:
                 continue
 
-            inicio = posicoes[origem]
-            fim = posicoes[destino]
+            inicio = posicoes[origem_real]
+            fim = posicoes[destino_real]
             if inicio == fim:
                 continue
-
-            x1, y1 = inicio
-            x2, y2 = fim
-            if x1 > x2 or (x1 == x2 and y1 > y2):
-                inicio, fim = fim, inicio
 
             flecha = FancyArrowPatch(
                 inicio,
@@ -791,54 +797,51 @@ larissa x filme_meu_vizinho_totoro</pre>
             """
             <style>
             body {margin: 0; background-color: transparent; color: #e2e8f0; font-family: 'Inter', 'Segoe UI', sans-serif;}
-            .painel {display: flex; flex-direction: column; gap: 18px; padding: 6px 0 18px;}
+            .painel {display: flex; flex-direction: column; gap: 12px; padding: 6px 0 12px;}
             .painel.vazio {min-height: 160px; align-items: center; justify-content: center;}
-            .mensagem-vazia {margin: 0; padding: 18px 24px; border-radius: 14px; background: rgba(15, 23, 42, 0.68);
-                             border: 1px solid rgba(148, 163, 184, 0.3); font-weight: 600; letter-spacing: 0.04em;}
-            .grupo {display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; border-radius: 18px;
-                    border: 1px solid rgba(148, 163, 184, 0.28); background: rgba(15, 23, 42, 0.72);
-                    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.28);}
-            .grupo-0 {border-color: rgba(59, 130, 246, 0.35); box-shadow: 0 16px 32px rgba(37, 99, 235, 0.18);}
-            .grupo-1 {border-color: rgba(234, 88, 12, 0.35); box-shadow: 0 16px 32px rgba(194, 65, 12, 0.18);}
-            .grupo-cabecalho {display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;
-                              border-bottom: 1px solid rgba(148, 163, 184, 0.26); padding-bottom: 12px;}
-            .grupo-identificacao {display: flex; flex-direction: column; gap: 4px;}
-            .grupo-etiqueta {font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; color: #38bdf8;}
+            .mensagem-vazia {margin: 0; padding: 16px 20px; border-radius: 12px; background: rgba(15, 23, 42, 0.72);
+                             border: 1px solid rgba(148, 163, 184, 0.26); font-weight: 600; letter-spacing: 0.02em;}
+            .grupo {display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-radius: 16px;
+                    border: 1px solid rgba(148, 163, 184, 0.22); background: rgba(15, 23, 42, 0.66);}
+            .grupo-0 {border-color: rgba(59, 130, 246, 0.32);}
+            .grupo-1 {border-color: rgba(234, 88, 12, 0.32);}
+            .grupo-cabecalho {display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: flex-start;
+                              padding-bottom: 8px; border-bottom: 1px solid rgba(148, 163, 184, 0.18);}
+            .grupo-info {display: flex; flex-direction: column; gap: 4px; min-width: 0;}
+            .grupo-etiqueta {font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; color: #38bdf8;}
             .grupo.grupo-1 .grupo-etiqueta {color: #fb923c;}
             .grupo.grupo-outros .grupo-etiqueta {color: #cbd5f5;}
-            .grupo-descricao {font-size: 18px; font-weight: 600; color: #f8fafc;}
+            .grupo-descricao {font-size: 17px; font-weight: 600; color: #f8fafc; word-break: break-word;}
             .grupo-resumo {font-size: 13px; font-weight: 600; color: #cbd5f5; background: rgba(15, 23, 42, 0.55);
-                          border-radius: 999px; padding: 4px 14px; border: 1px solid rgba(148, 163, 184, 0.32);}
-            .cartoes {display: flex; flex-direction: column; gap: 12px;}
-            .cartao {display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 16px; border-radius: 14px;
-                     background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(100, 116, 139, 0.4);
-                     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);}
-            .cartao-topo {display: flex; justify-content: space-between; align-items: center; gap: 12px;}
-            .cartao-nome {font-size: 16px; font-weight: 700; color: #f8fafc; word-break: break-word;}
-            .tag {padding: 4px 14px; border-radius: 999px; font-size: 11px; letter-spacing: 0.08em; font-weight: 600;
-                   text-transform: uppercase;}
-            .tag-0 {background-color: rgba(37, 99, 235, 0.22); color: #bfdbfe; border: 1px solid rgba(59, 130, 246, 0.4);}
-            .tag-1 {background-color: rgba(217, 119, 6, 0.24); color: #fed7aa; border: 1px solid rgba(251, 191, 36, 0.35);}
-            .tag--1 {background-color: rgba(148, 163, 184, 0.25); color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.35);}
-            .cartao-conexoes {display: flex; align-items: flex-start; gap: 12px;}
-            .cartao-seta {font-size: 20px; line-height: 1; color: #38bdf8; padding-top: 2px;}
+                          border-radius: 999px; padding: 4px 12px; border: 1px solid rgba(148, 163, 184, 0.28);}
+            .cartoes {display: flex; flex-direction: column; gap: 10px;}
+            .cartao {display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px;
+                     background: rgba(15, 23, 42, 0.54); border: 1px solid rgba(100, 116, 139, 0.34);}
+            .cartao-cabecalho {display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between;}
+            .cartao-nome {font-size: 15px; font-weight: 700; color: #f8fafc; word-break: break-word;}
+            .cartao-tag {padding: 4px 12px; border-radius: 999px; font-size: 11px; letter-spacing: 0.08em; font-weight: 600;
+                        text-transform: uppercase; border: 1px solid transparent;}
+            .cartao-tag.tag-0 {background-color: rgba(37, 99, 235, 0.18); color: #bfdbfe; border-color: rgba(59, 130, 246, 0.3);}
+            .cartao-tag.tag-1 {background-color: rgba(217, 119, 6, 0.2); color: #fed7aa; border-color: rgba(251, 191, 36, 0.3);}
+            .cartao-tag.tag--1 {background-color: rgba(148, 163, 184, 0.2); color: #e2e8f0; border-color: rgba(148, 163, 184, 0.3);}
+            .cartao-corpo {display: flex; gap: 10px; align-items: flex-start;}
+            .cartao-seta {font-size: 18px; line-height: 1; color: #38bdf8; padding-top: 2px;}
             .grupo.grupo-1 .cartao-seta {color: #fb923c;}
-            .cartao-destinos {display: flex; flex-wrap: wrap; gap: 8px;}
-            .chip {display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 12px;
-                   background: rgba(148, 163, 184, 0.14); border: 1px solid rgba(148, 163, 184, 0.32); color: #e2e8f0;
-                   transition: background 0.2s ease, transform 0.2s ease;}
-            .chip::before {content: '•'; font-size: 16px; opacity: 0.6;}
-            .chip:hover {transform: translateY(-1px); background: rgba(148, 163, 184, 0.24);}
-            .chip.vizinho {background: rgba(14, 165, 233, 0.22); border-color: rgba(56, 189, 248, 0.35); color: #bae6fd;}
+            .cartao-destinos {display: flex; flex-wrap: wrap; gap: 6px;}
+            .chip {display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px;
+                   background: rgba(148, 163, 184, 0.16); border: 1px solid rgba(148, 163, 184, 0.28); color: #e2e8f0;}
+            .chip::before {content: '•'; font-size: 14px; opacity: 0.6;}
+            .chip.vizinho {background: rgba(14, 165, 233, 0.18); border-color: rgba(56, 189, 248, 0.32); color: #bae6fd;}
             .chip.vizinho::before {color: #38bdf8;}
-            .chip.conflito {background: rgba(248, 113, 113, 0.24); border-color: rgba(248, 113, 113, 0.45); color: #fecaca; font-weight: 600;}
+            .chip.conflito {background: rgba(248, 113, 113, 0.22); border-color: rgba(248, 113, 113, 0.38); color: #fecaca; font-weight: 600;}
             .chip.conflito::before {color: #f87171; content: '⚠'; font-size: 14px; opacity: 1;}
-            .chip.vazio {background: rgba(100, 116, 139, 0.24); border-style: dashed; color: #cbd5f5; font-style: italic;}
+            .chip.vazio {background: rgba(100, 116, 139, 0.22); border-style: dashed; color: #cbd5f5; font-style: italic;}
             .cartao-rodape {font-size: 12px; color: #94a3b8;}
             @media (max-width: 720px) {
-              .grupo {padding: 16px;}
-              .cartao {padding: 12px 14px;}
-              .cartao-topo {align-items: flex-start; flex-direction: column;}
+              .grupo {padding: 12px;}
+              .cartao {padding: 10px 12px;}
+              .cartao-corpo {flex-direction: column;}
+              .cartao-seta {padding: 0;}
             }
             </style>
             """
