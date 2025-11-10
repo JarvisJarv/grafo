@@ -22,12 +22,31 @@ def main() -> None:
         help="Abre uma visualização gráfica com as partições e conflitos",
     )
     parser.add_argument(
+        "--animar",
+        action="store_true",
+        help="Exibe a animação passo a passo do algoritmo de bipartição",
+    )
+    parser.add_argument(
+        "--exportar-animacao",
+        type=Path,
+        help="Exporta a animação em MP4 ou GIF para o caminho informado",
+    )
+    parser.add_argument(
         "--layout",
         choices=("spring", "circular", "kamada_kawai"),
         default="spring",
         help="Algoritmo de posicionamento dos vértices ao exibir o grafo",
     )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=1,
+        help="Quadros por segundo ao animar ou exportar a execução",
+    )
     args = parser.parse_args()
+
+    if args.fps <= 0:
+        parser.error("--fps deve ser maior que zero")
 
     grafo = GrafoBipartido()
     grafo.carregar_de_arquivo(args.arquivo)
@@ -58,6 +77,29 @@ def main() -> None:
                 "Instale 'matplotlib' e 'networkx' para utilizar --plot."
             )
             raise SystemExit(f"{mensagem}\nDetalhes: {exc}") from exc
+
+    if args.animar or args.exportar_animacao:
+        try:
+            from grafo.visualizacao import animar_verificacao
+
+            animar_verificacao(
+                grafo,
+                layout=args.layout,
+                titulo=f"Execução do algoritmo para {args.arquivo}",
+                mostrar=args.animar,
+                caminho_saida=str(args.exportar_animacao) if args.exportar_animacao else None,
+                fps=args.fps,
+            )
+            if args.exportar_animacao:
+                print(f"Animação exportada para {args.exportar_animacao}")
+        except ImportError as exc:
+            mensagem = (
+                "Dependências de visualização não disponíveis. "
+                "Instale 'matplotlib' e 'networkx' para utilizar --animar ou --exportar-animacao."
+            )
+            raise SystemExit(f"{mensagem}\nDetalhes: {exc}") from exc
+        except RuntimeError as exc:
+            raise SystemExit(str(exc)) from exc
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from .io import DadosGrafo, carregar_de_arquivo
 
@@ -29,6 +29,18 @@ class ResultadoBiparticao:
         """Retorna as duas partições identificadas (cores 0 e 1)."""
 
         return self.particao(0), self.particao(1)
+
+
+@dataclass(frozen=True)
+class PassoBiparticao:
+    """Representa uma etapa da execução do algoritmo de bipartição."""
+
+    descricao: str
+    vertice_atual: Optional[str]
+    fila: Sequence[str]
+    cores: Dict[str, Cor]
+    conflitos: List[Aresta]
+    aresta_analisada: Optional[Aresta] = None
 
 
 class GrafoBipartido:
@@ -84,34 +96,89 @@ class GrafoBipartido:
     def verificar_biparticao(self) -> ResultadoBiparticao:
         """Executa um BFS para colorir o grafo e verifica conflitos."""
 
+        resultado, _ = self._executar_bfs(registrar_passos=False)
+        return resultado
+
+    def verificar_biparticao_com_passos(self) -> Tuple[ResultadoBiparticao, List[PassoBiparticao]]:
+        """Executa o BFS registrando as etapas percorridas."""
+
+        return self._executar_bfs(registrar_passos=True)
+
+    def _executar_bfs(
+        self, *, registrar_passos: bool
+    ) -> Tuple[ResultadoBiparticao, List[PassoBiparticao]]:
         cores: Dict[str, Cor] = {}
         conflitos: List[Aresta] = []
+        passos: List[PassoBiparticao] = []
+
+        fila: deque[str] = deque()
+
+        def registrar(descricao: str, vertice: Optional[str] = None, aresta: Optional[Aresta] = None) -> None:
+            if not registrar_passos:
+                return
+
+            passos.append(
+                PassoBiparticao(
+                    descricao=descricao,
+                    vertice_atual=vertice,
+                    fila=list(fila),
+                    cores=dict(cores),
+                    conflitos=list(conflitos),
+                    aresta_analisada=aresta,
+                )
+            )
 
         for vertice in self._vertices:
             if vertice in cores:
                 continue
 
             cores[vertice] = 0
-            fila: deque[str] = deque([vertice])
+            fila.clear()
+            fila.append(vertice)
+            registrar(f"Iniciando componente a partir de {vertice}", vertice)
 
             while fila:
                 atual = fila.popleft()
+                registrar(f"Processando vértice {atual}", atual)
                 cor_atual = cores[atual]
                 cor_oposta = 1 - cor_atual
 
                 for vizinho in self._adjacencia.get(atual, set()):
+                    aresta = tuple(sorted((atual, vizinho)))
                     if vizinho not in cores:
                         cores[vizinho] = cor_oposta
                         fila.append(vizinho)
+                        registrar(
+                            f"Colorindo {vizinho} com a cor {cor_oposta} e adicionando à fila",
+                            vertice=atual,
+                            aresta=aresta,
+                        )
                     elif cores[vizinho] == cor_atual:
-                        origem, destino = sorted((atual, vizinho))
-                        conflito: Aresta = (origem, destino)
-                        if conflito not in conflitos:
-                            conflitos.append(conflito)
+                        if aresta not in conflitos:
+                            conflitos.append(aresta)
+                        registrar(
+                            f"Conflito detectado em {atual} -- {vizinho}",
+                            vertice=atual,
+                            aresta=aresta,
+                        )
+                    else:
+                        registrar(
+                            f"Aresta {atual} -- {vizinho} respeita as cores", vertice=atual, aresta=aresta
+                        )
+
+            registrar(f"Componente iniciado em {vertice} completamente processado")
 
         eh_bipartido = not conflitos
-        self._resultado = ResultadoBiparticao(eh_bipartido=eh_bipartido, cores=cores, conflitos=conflitos)
-        return self._resultado
+        resultado = ResultadoBiparticao(eh_bipartido=eh_bipartido, cores=cores, conflitos=conflitos)
+        self._resultado = resultado
+
+        registrar(
+            "Verificação concluída: "
+            + ("grafo bipartido sem conflitos" if eh_bipartido else "conflitos detectados"),
+            vertice=None,
+        )
+
+        return resultado, passos
 
     def obter_particoes(self) -> Tuple[Set[str], Set[str]]:
         """Retorna as partições, executando a verificação se necessário."""
