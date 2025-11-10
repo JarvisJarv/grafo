@@ -70,7 +70,7 @@ def main() -> None:
     gerar_captura_estatica(
         grafo_bipartido,
         pasta_imagens / "visualizacao_bipartido.png",
-        layout="spring",
+        layout="flechas",
     )
     gerar_animacao_coloracao(
         grafo_nao_bipartido,

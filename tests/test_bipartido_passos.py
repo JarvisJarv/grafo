@@ -1,6 +1,6 @@
 """Testes para a captura de passos do algoritmo de bipartição."""
 from grafo.bipartido import GrafoBipartido, PassoBiparticao
-from grafo.io import DadosGrafo
+from grafo.io import DadosGrafo, carregar_de_iteravel
 
 
 def _construir_grafo(vertices, arestas) -> GrafoBipartido:
@@ -41,3 +41,23 @@ def test_verificar_biparticao_com_passos_com_conflito() -> None:
     assert any("Conflito detectado" in descricao for descricao in descricoes)
     ultimo_passo = passos[-1]
     assert "conflitos detectados" in ultimo_passo.descricao
+
+
+def test_conflito_de_tipo_detectado() -> None:
+    linhas = [
+        "[vertices]",
+        "Gabriel tipo=pessoa",
+        "Marcelo tipo=pessoa",
+        "Moana tipo=filme",
+        "[arestas]",
+        "Gabriel Moana",
+        "Marcelo Gabriel",
+    ]
+    dados = carregar_de_iteravel(linhas)
+    grafo = GrafoBipartido()
+    grafo.carregar(dados)
+
+    resultado = grafo.verificar_biparticao()
+
+    assert not resultado.eh_bipartido
+    assert {tuple(sorted(conflito)) for conflito in resultado.conflitos} == {("Gabriel", "Marcelo")}
