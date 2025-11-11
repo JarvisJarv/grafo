@@ -510,7 +510,11 @@ def animar_verificacao(
 
     def _alternar_pausa() -> None:
         if bool(estado_animacao["pausado"]):
-            _retomar()
+            indice_atual = int(estado_animacao["indice_atual"])
+            if total_passos and indice_atual >= total_passos - 1:
+                _reiniciar()
+            else:
+                _retomar()
         else:
             _pausar()
 
@@ -545,10 +549,11 @@ def animar_verificacao(
         except AttributeError:
             pass
         estado_animacao["indice_atual"] = 0
-        estado_animacao["pausado"] = True
+        estado_animacao["pausado"] = False
         animacao.frame_seq = iter(range(1 if total_passos > 1 else 0, total_passos))
         if fig.canvas is not None:
             fig.canvas.draw_idle()
+        _iniciar_animacao()
 
     def _mais_rapido() -> None:
         intervalo_atual = float(estado_animacao["intervalo"])
