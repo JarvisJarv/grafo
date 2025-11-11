@@ -261,12 +261,18 @@ def animar_verificacao(
     resultado, passos = grafo.verificar_biparticao_com_passos()
     grafo_nx, posicoes, _, _, _ = preparar_desenho(grafo, layout=layout)
 
-    fig, (eixo_grafo, eixo_info) = plt.subplots(
-        1,
+    fig = plt.figure(figsize=(12, 7))
+    grade = fig.add_gridspec(
         2,
-        figsize=(11, 6),
-        gridspec_kw={"width_ratios": [3.8, 1.5]},
+        2,
+        height_ratios=[3.5, 1.0],
+        width_ratios=[3.6, 1.6],
+        hspace=0.35,
+        wspace=0.3,
     )
+    eixo_grafo = fig.add_subplot(grade[0, 0])
+    eixo_info = fig.add_subplot(grade[0, 1])
+    eixo_legenda = fig.add_subplot(grade[1, :])
     fig.patch.set_facecolor("#f8fafc")
     eixo_info.set_facecolor("#e2e8f0")
     colecao_arestas = nx.draw_networkx_edges(grafo_nx, posicoes, ax=eixo_grafo, width=2)
@@ -302,19 +308,25 @@ def animar_verificacao(
         plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="mediumpurple", label="Fila"),
         plt.Line2D([0], [0], color="red", lw=2, label="Conflito"),
     ]
-    eixo_grafo.legend(handles=elementos_legenda, loc="upper right")
+    eixo_legenda.set_axis_off()
+    eixo_legenda.legend(
+        handles=elementos_legenda,
+        loc="center",
+        ncol=len(elementos_legenda),
+        frameon=False,
+    )
 
     eixo_info.set_axis_off()
     eixo_info.set_xlim(0, 1)
     eixo_info.set_ylim(0, 1)
 
     texto_info = eixo_info.text(
-        0.0,
-        1.0,
+        0.5,
+        0.5,
         _formatar_texto_passo(passos[0]) if passos else "",
         transform=eixo_info.transAxes,
-        verticalalignment="top",
-        horizontalalignment="left",
+        verticalalignment="center",
+        horizontalalignment="center",
         wrap=True,
         bbox=dict(boxstyle="round", facecolor="white", alpha=0.95),
     )
@@ -358,6 +370,10 @@ def animar_verificacao(
             raise RuntimeError(f"Falha ao exportar animação para {caminho}: {exc}") from exc
 
     if mostrar:
+        try:
+            fig.canvas.manager.full_screen_toggle()  # type: ignore[union-attr]
+        except AttributeError:
+            pass
         plt.show()
     else:
         plt.close(fig)
