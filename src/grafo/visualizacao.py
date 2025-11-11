@@ -460,7 +460,10 @@ def animar_verificacao(
     _registrar_animacao_ativa(fig, animacao)
     setattr(fig, "_animacao_ref", animacao)
 
-    if mostrar:
+    # Controles desativados temporariamente para investigar falha no gráfico
+    controles_habilitados = False
+
+    if mostrar and controles_habilitados:
         fig.subplots_adjust(top=0.9, bottom=0.18)
 
         area_botao = fig.add_axes([0.84, 0.88, 0.12, 0.08])
