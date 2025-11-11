@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 import networkx as nx
 
@@ -454,7 +454,7 @@ def animar_verificacao(
         botao_fechar.label.set_color("#7f1d1d")
 
         def _fechar_animacao(_event: object) -> None:
-            animacao.event_source.stop()
+            _parar_animacao()
             plt.close(fig)
 
         botao_fechar.on_clicked(_fechar_animacao)
@@ -469,12 +469,30 @@ def animar_verificacao(
             fontsize=10,
         )
 
+        def _event_source() -> Any:
+            return getattr(animacao, "event_source", None)
+
+        def _parar_animacao() -> None:
+            event_source = _event_source()
+            if event_source is not None:
+                event_source.stop()
+
+        def _iniciar_animacao() -> None:
+            event_source = _event_source()
+            if event_source is not None:
+                event_source.start()
+
+        def _atualizar_intervalo_event_source(intervalo_ajustado: float) -> None:
+            event_source = _event_source()
+            if event_source is not None:
+                event_source.interval = int(intervalo_ajustado)
+
         def _definir_intervalo(novo_intervalo: float) -> None:
             limite_inferior = 30.0
             limite_superior = 5000.0
             intervalo_ajustado = max(limite_inferior, min(limite_superior, novo_intervalo))
             estado_animacao["intervalo"] = intervalo_ajustado
-            animacao.event_source.interval = int(intervalo_ajustado)
+            _atualizar_intervalo_event_source(intervalo_ajustado)
             fator = estado_animacao["intervalo_base"] / intervalo_ajustado
             texto_velocidade.set_text(f"Velocidade: {fator:.1f}×")
             fig.canvas.draw_idle()
@@ -484,10 +502,10 @@ def animar_verificacao(
                 return
             pausado = bool(estado_animacao["pausado"])
             if pausado:
-                animacao.event_source.start()
+                _iniciar_animacao()
                 botao_pausa.label.set_text("Pausar")
             else:
-                animacao.event_source.stop()
+                _parar_animacao()
                 botao_pausa.label.set_text("Despausar")
             estado_animacao["pausado"] = not pausado
             fig.canvas.draw_idle()
@@ -496,7 +514,7 @@ def animar_verificacao(
             if total_passos == 0:
                 return
             indice_limitado = max(0, min(total_passos - 1, indice))
-            animacao.event_source.stop()
+            _parar_animacao()
             estado_animacao["pausado"] = True
             botao_pausa.label.set_text("Despausar")
             atualizar(indice_limitado)
