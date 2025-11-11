@@ -254,7 +254,7 @@ def animar_verificacao(
     mostrar: bool = True,
     caminho_saida: str | Path | None = None,
     fps: int = 1,
-    intervalo_ms: int = 1000,
+    intervalo_ms: int = 600,
 ) -> FuncAnimation:
     """Cria uma animação destacando as etapas da verificação do grafo."""
 
@@ -285,6 +285,8 @@ def animar_verificacao(
         linewidths=1.5,
         edgecolors="black",
     )
+    colecao_arestas.set_animated(True)
+    colecao_vertices.set_animated(True)
     posicoes_rotulos = _deslocar_rotulos(posicoes)
     nx.draw_networkx_labels(
         grafo_nx,
@@ -330,18 +332,28 @@ def animar_verificacao(
         wrap=True,
         bbox=dict(boxstyle="round", facecolor="white", alpha=0.95),
     )
+    texto_info.set_animated(True)
 
     plt.tight_layout()
 
     def atualizar(indice: int) -> Sequence[object]:
         passo = passos[indice]
         cores_vertices = _cores_vertices_passo(grafo_nx, passo)
-        colecao_vertices.set_color(cores_vertices)
+        colecao_vertices.set_facecolor(cores_vertices)
         cores_arestas = _cores_arestas_passo(grafo_nx, passo)
         colecao_arestas.set_color(cores_arestas)
         texto_info.set_text(_formatar_texto_passo(passo))
         if titulo:
             eixo_grafo.set_title(f"{titulo} — etapa {indice + 1}/{len(passos)}")
+        return colecao_vertices, colecao_arestas, texto_info
+
+    def inicializar() -> Sequence[object]:
+        if passos:
+            cores_iniciais = _cores_vertices_passo(grafo_nx, passos[0])
+            colecao_vertices.set_facecolor(cores_iniciais)
+            cores_arestas_iniciais = _cores_arestas_passo(grafo_nx, passos[0])
+            colecao_arestas.set_color(cores_arestas_iniciais)
+            texto_info.set_text(_formatar_texto_passo(passos[0]))
         return colecao_vertices, colecao_arestas, texto_info
 
     animacao = FuncAnimation(
@@ -350,6 +362,9 @@ def animar_verificacao(
         frames=len(passos),
         interval=max(1, intervalo_ms),
         repeat=False,
+        init_func=inicializar,
+        blit=True,
+        cache_frame_data=False,
     )
     setattr(fig, "_animacao_ref", animacao)
 

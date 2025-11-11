@@ -100,6 +100,7 @@ class VisualizadorBipartido(QMainWindow):
         self._resultado: Optional[ResultadoBiparticao] = None
         self._arquivo_atual: Optional[Path] = None
         self._layout_atual: str = "flechas"
+        self._assinatura_conflitos: Optional[Tuple[Tuple[str, str], ...]] = None
 
         self._aplicar_tema_moderno()
         self._criar_componentes()
@@ -214,6 +215,9 @@ class VisualizadorBipartido(QMainWindow):
         botao_exportar = QPushButton("Exportar visualização…")
         botao_exportar.clicked.connect(self._exportar_imagem)
 
+        botao_exportar_animacao = QPushButton("Exportar animação…")
+        botao_exportar_animacao.clicked.connect(self._exportar_animacao)
+
         layout.addWidget(botao_abrir)
         layout.addWidget(self.combo_exemplos)
         layout.addWidget(botoes_layout)
@@ -225,6 +229,7 @@ class VisualizadorBipartido(QMainWindow):
         botao_animacao.clicked.connect(self._mostrar_animacao)
 
         layout.addWidget(botao_exportar)
+        layout.addWidget(botao_exportar_animacao)
         layout.addWidget(botao_animacao)
         layout.addStretch(1)
 
@@ -400,11 +405,48 @@ class VisualizadorBipartido(QMainWindow):
                 layout=layout_animacao,
                 titulo=titulo,
                 mostrar=True,
+                fps=2,
+                intervalo_ms=600,
             )
         except RuntimeError as exc:  # pragma: no cover - interface
             self._mostrar_erro("Não foi possível exibir a animação", exc)
         except Exception as exc:  # pragma: no cover - interface
             self._mostrar_erro("Falha inesperada ao abrir a animação", exc)
+
+    def _exportar_animacao(self) -> None:
+        if self._resultado is None:
+            QMessageBox.information(
+                self,
+                "Nada para exportar",
+                "Carregue um grafo antes de exportar a animação.",
+            )
+            return
+
+        caminho, _ = QFileDialog.getSaveFileName(
+            self,
+            "Exportar animação",
+            str(self._pasta_base() / "animacao.gif"),
+            "GIF (*.gif);;MP4 (*.mp4)",
+        )
+        if not caminho:
+            return
+
+        layout_animacao = "bipartido" if self._layout_atual == "flechas" else self._layout_atual
+        try:
+            animar_verificacao(
+                self._grafo,
+                layout=layout_animacao,
+                titulo="Execução passo a passo do algoritmo",
+                mostrar=False,
+                caminho_saida=caminho,
+                fps=2,
+                intervalo_ms=600,
+            )
+            self.statusBar().showMessage(f"Animação exportada para {caminho}")
+        except RuntimeError as exc:  # pragma: no cover - interface
+            self._mostrar_erro("Não foi possível exportar a animação", exc)
+        except Exception as exc:  # pragma: no cover - interface
+            self._mostrar_erro("Falha inesperada ao exportar a animação", exc)
 
     # ------------------------------------------------------------------
     # Atualização de conteúdo
@@ -416,6 +458,7 @@ class VisualizadorBipartido(QMainWindow):
         self._atualizar_resumo()
         self._atualizar_relacionamentos()
         self._desenhar_grafo()
+        self._notificar_conflitos_se_necessario()
 
     def _atualizar_resumo(self) -> None:
         assert self._resultado is not None
@@ -676,6 +719,27 @@ class VisualizadorBipartido(QMainWindow):
         ax.set_title(titulo)
 
         self.canvas.draw_idle()
+
+    def _notificar_conflitos_se_necessario(self) -> None:
+        if not self._resultado:
+            self._assinatura_conflitos = None
+            return
+
+        if self._resultado.eh_bipartido or not self._resultado.conflitos:
+            self._assinatura_conflitos = None
+            return
+
+        conflitos_ordenados = tuple(sorted(tuple(sorted(aresta)) for aresta in self._resultado.conflitos))
+        if conflitos_ordenados == self._assinatura_conflitos:
+            return
+
+        self._assinatura_conflitos = conflitos_ordenados
+        lista = "\n".join(" — ".join(aresta) for aresta in conflitos_ordenados)
+        QMessageBox.warning(
+            self,
+            "Conflitos identificados",
+            "Foram encontrados conflitos na bipartição:\n" f"{lista}",
+        )
 
     # ------------------------------------------------------------------
     # Utilidades
