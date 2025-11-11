@@ -478,66 +478,65 @@ class VisualizadorBipartido(QMainWindow):
                 chave_grupo,
                 {
                     "cor": cor_vertice if cor_vertice in (0, 1) else -1,
-                    "vertices": [],
+                    "linhas": [],
                     "tipos": Counter(),
-                    "relacoes": 0,
+                    "total_relacoes": 0,
                 },
             )
 
             if tipo:
                 info["tipos"][tipo] += 1
 
-            tag_modificador = f"tag-{cor_vertice}" if cor_vertice in (0, 1) else "tag--1"
-
-            vizinhos_markup: List[str] = []
+            destinos: List[str] = []
             for vizinho in sorted(adjacencias[vertice]):
                 aresta = tuple(sorted((vertice, vizinho)))
-                classe = "chip conflito" if aresta in conflitos else "chip vizinho"
-                vizinhos_markup.append(f"<span class='{classe}'>{vizinho}</span>")
+                classe = "destino conflito" if aresta in conflitos else "destino vizinho"
+                destinos.append(f"<li class='{classe}'>{vizinho}</li>")
 
-            if vizinhos_markup:
-                destinos_html = "".join(vizinhos_markup)
-                resumo_cartao = f"{len(vizinhos_markup)} relação{'es' if len(vizinhos_markup) != 1 else ''}"
+            if destinos:
+                destinos_html = "<ul class='lista-destinos'>" + "".join(destinos) + "</ul>"
+                contador = f"{len(destinos)} relação{'es' if len(destinos) != 1 else ''}"
             else:
-                destinos_html = "<span class='chip vazio'>Sem conexões</span>"
-                resumo_cartao = "Nenhuma relação registrada"
+                destinos_html = "<div class='lista-destinos vazio'>Sem conexões registradas</div>"
+                contador = "Nenhuma relação"
 
-            info["relacoes"] += len(vizinhos_markup)
+            info["total_relacoes"] += len(destinos)
 
-            card_html = (
-                "<article class='cartao'>"
-                "<div class='cartao-cabecalho'>"
-                f"<span class='cartao-nome'>{vertice}</span>"
-                f"<span class='cartao-tag {tag_modificador}'>{etiqueta}</span>"
-                "</div>"
-                "<div class='cartao-corpo'>"
-                "<span class='cartao-seta' aria-hidden='true'>→</span>"
-                f"<div class='cartao-destinos'>{destinos_html}</div>"
-                "</div>"
-                f"<div class='cartao-rodape'>{resumo_cartao}</div>"
-                "</article>"
+            linha = (
+                "<tr>"
+                f"<th scope='row' class='col-origem'>{vertice}</th>"
+                f"<td class='col-tipo'>{etiqueta}</td>"
+                f"<td class='col-relacoes'>{destinos_html}<span class='contador'>{contador}</span></td>"
+                "</tr>"
             )
-
-            info["vertices"].append(card_html)
+            info.setdefault("linhas", []).append(linha)
 
         secoes: List[str] = []
+        total_vertices = len(adjacencias)
+        total_relacoes = sum(len(v) for v in adjacencias.values())
+        total_conflitos = len(conflitos)
+
+        resumo_html = (
+            "<section class='resumo'>"
+            f"<div class='resumo-item'><span class='resumo-numero'>{total_vertices}</span>"
+            "<span class='resumo-legenda'>vértice(s) listados</span></div>"
+            f"<div class='resumo-item'><span class='resumo-numero'>{total_relacoes}</span>"
+            "<span class='resumo-legenda'>relações mapeadas</span></div>"
+            f"<div class='resumo-item destaque'><span class='resumo-numero'>{total_conflitos}</span>"
+            "<span class='resumo-legenda'>arestas em conflito</span></div>"
+            "</section>"
+        )
+        secoes.append(resumo_html)
+
         for chave in ("0", "1", "sem"):
             info = grupos.get(chave)
             if not info:
                 continue
 
             cor_grupo = int(info["cor"]) if isinstance(info["cor"], int) else -1
-            total_vertices = len(info["vertices"])
-            total_relacoes = int(info["relacoes"])
-            resumo_itens = [
-                f"{total_vertices} vértice{'s' if total_vertices != 1 else ''}",
-                (
-                    f"{total_relacoes} relação{'es' if total_relacoes != 1 else ''}"
-                    if total_relacoes
-                    else "Nenhuma relação"
-                ),
-            ]
-            resumo_texto = " • ".join(resumo_itens)
+            linhas = info.get("linhas", [])
+            total_rel = int(info.get("total_relacoes", 0))
+            total_vertices_grupo = len(linhas)
 
             if cor_grupo in (0, 1):
                 titulo = f"Partição {cor_grupo}"
@@ -551,7 +550,7 @@ class VisualizadorBipartido(QMainWindow):
                 )
                 classe_grupo = f"grupo grupo-{cor_grupo}"
             else:
-                titulo = "Sem partição"
+                titulo = "Sem partição definida"
                 if isinstance(info["tipos"], Counter) and info["tipos"]:
                     descricoes = {
                         chave_tipo.replace("_", " ").title()
@@ -562,6 +561,28 @@ class VisualizadorBipartido(QMainWindow):
                     descricao = "Vértices não classificados"
                 classe_grupo = "grupo grupo-outros"
 
+            resumo = (
+                f"{total_vertices_grupo} vértice{'s' if total_vertices_grupo != 1 else ''}"
+                " • "
+                + (
+                    f"{total_rel} relação{'es' if total_rel != 1 else ''}"
+                    if total_rel
+                    else "nenhuma relação"
+                )
+            )
+
+            tabela = (
+                "<table class='tabela-relacoes'>"
+                "<thead><tr>"
+                "<th class='col-origem'>Origem</th>"
+                "<th class='col-tipo'>Categoria</th>"
+                "<th class='col-relacoes'>Destinos</th>"
+                "</tr></thead>"
+                "<tbody>"
+                + "".join(linhas)
+                + "</tbody></table>"
+            )
+
             grupo_html = (
                 f"<section class='{classe_grupo}'>"
                 "<header class='grupo-cabecalho'>"
@@ -569,12 +590,10 @@ class VisualizadorBipartido(QMainWindow):
                 f"<span class='grupo-etiqueta'>{titulo}</span>"
                 f"<span class='grupo-descricao'>{descricao}</span>"
                 "</div>"
-                f"<span class='grupo-resumo'>{resumo_texto}</span>"
+                f"<span class='grupo-resumo'>{resumo}</span>"
                 "</header>"
-                "<div class='cartoes'>"
-                + "".join(info["vertices"])
-                + "</div>"
-                "</section>"
+                + tabela
+                + "</section>"
             )
             secoes.append(grupo_html)
 
@@ -909,51 +928,53 @@ larissa x filme_meu_vizinho_totoro</pre>
             """
             <style>
             body {margin: 0; background-color: transparent; color: #e2e8f0; font-family: 'Inter', 'Segoe UI', sans-serif;}
-            .painel {display: flex; flex-direction: column; gap: 12px; padding: 6px 0 12px;}
-            .painel.vazio {min-height: 160px; align-items: center; justify-content: center;}
-            .mensagem-vazia {margin: 0; padding: 16px 20px; border-radius: 12px; background: rgba(15, 23, 42, 0.72);
-                             border: 1px solid rgba(148, 163, 184, 0.26); font-weight: 600; letter-spacing: 0.02em;}
-            .grupo {display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-radius: 16px;
-                    border: 1px solid rgba(148, 163, 184, 0.22); background: rgba(15, 23, 42, 0.66);}
+            .painel {display: flex; flex-direction: column; gap: 16px; padding: 8px 0 16px;}
+            .painel.vazio {min-height: 160px; align-items: center; justify-content: center; display: flex;}
+            .mensagem-vazia {margin: 0; padding: 20px; border-radius: 14px; background: rgba(15, 23, 42, 0.72);
+                             border: 1px solid rgba(148, 163, 184, 0.28); font-weight: 600; letter-spacing: 0.01em;}
+            .resumo {display: flex; flex-wrap: wrap; gap: 12px; background: rgba(15, 23, 42, 0.7);
+                     border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 16px; padding: 14px 16px;}
+            .resumo-item {display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px;
+                          background: rgba(30, 41, 59, 0.58); min-width: 120px;}
+            .resumo-item.destaque {background: rgba(248, 113, 113, 0.14); border: 1px solid rgba(248, 113, 113, 0.32);}
+            .resumo-numero {font-size: 22px; font-weight: 700; color: #f8fafc; line-height: 1.1;}
+            .resumo-item.destaque .resumo-numero {color: #fca5a5;}
+            .resumo-legenda {font-size: 12px; font-weight: 600; color: #cbd5f5; text-transform: uppercase; letter-spacing: 0.08em;}
+            .grupo {display: flex; flex-direction: column; gap: 0; border-radius: 18px; overflow: hidden;
+                    border: 1px solid rgba(148, 163, 184, 0.18); background: rgba(15, 23, 42, 0.64);}
             .grupo-0 {border-color: rgba(59, 130, 246, 0.32);}
             .grupo-1 {border-color: rgba(234, 88, 12, 0.32);}
-            .grupo-cabecalho {display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: flex-start;
-                              padding-bottom: 8px; border-bottom: 1px solid rgba(148, 163, 184, 0.18);}
-            .grupo-info {display: flex; flex-direction: column; gap: 4px; min-width: 0;}
-            .grupo-etiqueta {font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; color: #38bdf8;}
+            .grupo-cabecalho {display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start;
+                              gap: 10px; padding: 16px 18px; background: rgba(15, 23, 42, 0.78);}
+            .grupo-info {display: flex; flex-direction: column; gap: 6px; min-width: 0;}
+            .grupo-etiqueta {font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; color: #38bdf8;}
             .grupo.grupo-1 .grupo-etiqueta {color: #fb923c;}
             .grupo.grupo-outros .grupo-etiqueta {color: #cbd5f5;}
-            .grupo-descricao {font-size: 17px; font-weight: 600; color: #f8fafc; word-break: break-word;}
+            .grupo-descricao {font-size: 18px; font-weight: 600; color: #f8fafc; word-break: break-word;}
             .grupo-resumo {font-size: 13px; font-weight: 600; color: #cbd5f5; background: rgba(15, 23, 42, 0.55);
-                          border-radius: 999px; padding: 4px 12px; border: 1px solid rgba(148, 163, 184, 0.28);}
-            .cartoes {display: flex; flex-direction: column; gap: 10px;}
-            .cartao {display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px;
-                     background: rgba(15, 23, 42, 0.54); border: 1px solid rgba(100, 116, 139, 0.34);}
-            .cartao-cabecalho {display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between;}
-            .cartao-nome {font-size: 15px; font-weight: 700; color: #f8fafc; word-break: break-word;}
-            .cartao-tag {padding: 4px 12px; border-radius: 999px; font-size: 11px; letter-spacing: 0.08em; font-weight: 600;
-                        text-transform: uppercase; border: 1px solid transparent;}
-            .cartao-tag.tag-0 {background-color: rgba(37, 99, 235, 0.18); color: #bfdbfe; border-color: rgba(59, 130, 246, 0.3);}
-            .cartao-tag.tag-1 {background-color: rgba(217, 119, 6, 0.2); color: #fed7aa; border-color: rgba(251, 191, 36, 0.3);}
-            .cartao-tag.tag--1 {background-color: rgba(148, 163, 184, 0.2); color: #e2e8f0; border-color: rgba(148, 163, 184, 0.3);}
-            .cartao-corpo {display: flex; gap: 10px; align-items: flex-start;}
-            .cartao-seta {font-size: 18px; line-height: 1; color: #38bdf8; padding-top: 2px;}
-            .grupo.grupo-1 .cartao-seta {color: #fb923c;}
-            .cartao-destinos {display: flex; flex-wrap: wrap; gap: 6px;}
-            .chip {display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px;
-                   background: rgba(148, 163, 184, 0.16); border: 1px solid rgba(148, 163, 184, 0.28); color: #e2e8f0;}
-            .chip::before {content: '•'; font-size: 14px; opacity: 0.6;}
-            .chip.vizinho {background: rgba(14, 165, 233, 0.18); border-color: rgba(56, 189, 248, 0.32); color: #bae6fd;}
-            .chip.vizinho::before {color: #38bdf8;}
-            .chip.conflito {background: rgba(248, 113, 113, 0.22); border-color: rgba(248, 113, 113, 0.38); color: #fecaca; font-weight: 600;}
-            .chip.conflito::before {color: #f87171; content: '⚠'; font-size: 14px; opacity: 1;}
-            .chip.vazio {background: rgba(100, 116, 139, 0.22); border-style: dashed; color: #cbd5f5; font-style: italic;}
-            .cartao-rodape {font-size: 12px; color: #94a3b8;}
+                          border-radius: 999px; padding: 6px 14px; border: 1px solid rgba(148, 163, 184, 0.28);}
+            .tabela-relacoes {width: 100%; border-collapse: collapse; background: rgba(15, 23, 42, 0.82);}
+            .tabela-relacoes thead {background: rgba(30, 41, 59, 0.8);}
+            .tabela-relacoes th {font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: #a5b4fc;}
+            .tabela-relacoes th, .tabela-relacoes td {padding: 14px 18px; border-bottom: 1px solid rgba(148, 163, 184, 0.16); vertical-align: top;}
+            .tabela-relacoes tbody tr:last-child th, .tabela-relacoes tbody tr:last-child td {border-bottom: none;}
+            .col-origem {width: 26%; font-weight: 700; color: #f8fafc; word-break: break-word;}
+            .col-tipo {width: 20%; color: #e2e8f0; font-weight: 500;}
+            .col-relacoes {width: 54%;}
+            .lista-destinos {display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0;}
+            .lista-destinos.vazio {display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px;
+                                   border: 1px dashed rgba(148, 163, 184, 0.4); color: #cbd5f5; font-style: italic;}
+            .destino {display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12px;
+                      background: rgba(14, 116, 233, 0.15); border: 1px solid rgba(56, 189, 248, 0.28); color: #bae6fd;}
+            .destino::before {content: '•'; font-size: 14px; color: rgba(56, 189, 248, 0.9);}
+            .destino.conflito {background: rgba(248, 113, 113, 0.2); border-color: rgba(248, 113, 113, 0.36); color: #fecaca; font-weight: 600;}
+            .destino.conflito::before {content: '⚠'; color: #f87171;}
+            .contador {display: block; margin-top: 6px; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em;}
             @media (max-width: 720px) {
-              .grupo {padding: 12px;}
-              .cartao {padding: 10px 12px;}
-              .cartao-corpo {flex-direction: column;}
-              .cartao-seta {padding: 0;}
+              .resumo {flex-direction: column;}
+              .resumo-item {width: 100%;}
+              .grupo-cabecalho {padding: 14px;}
+              .tabela-relacoes th, .tabela-relacoes td {padding: 12px 14px;}
             }
             </style>
             """
