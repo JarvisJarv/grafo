@@ -219,8 +219,8 @@ class DialogoAnimacao(QDialog):
         controle = self._controles.get(nome)
         if callable(controle):
             controle()
-            if self._canvas.figure.canvas is not None:
-                self._canvas.figure.canvas.draw_idle()
+            if hasattr(self._canvas, "draw_idle"):
+                self._canvas.draw_idle()
         self._atualizar_status()
 
     def _atualizar_status(self) -> None:
@@ -249,8 +249,12 @@ class DialogoAnimacao(QDialog):
         pausar = self._controles.get("pausar")
         if callable(pausar):
             pausar()
-        if self._canvas.figure.canvas is not None:
-            self._canvas.figure.canvas.close_event()
+        figura = getattr(self._canvas, "figure", None)
+        if figura is not None:
+            backend_canvas = getattr(figura, "canvas", None)
+            close_event = getattr(backend_canvas, "close_event", None)
+            if callable(close_event):
+                close_event()
         super().closeEvent(event)
 
 class VisualizadorBipartido(QMainWindow):
@@ -280,6 +284,8 @@ class VisualizadorBipartido(QMainWindow):
     def _criar_componentes(self) -> None:
         abas = QTabWidget()
         abas.addTab(self._criar_aba_visualizacao(), "Visualizar grafo")
+        abas.addTab(self._criar_aba_relacionamentos(), "Relacionamentos detectados")
+        abas.addTab(self._criar_aba_formato_arquivo(), "Formato do arquivo .txt")
         abas.addTab(self._criar_aba_editor(), "Criar arquivo .txt")
         self.setCentralWidget(abas)
 
@@ -350,35 +356,6 @@ class VisualizadorBipartido(QMainWindow):
         layout_resumo.addRow("Partição 1:", self.rotulo_particao_b)
         layout_resumo.addRow("Conflitos:", self.rotulo_conflitos)
 
-        grupo_relacionamentos = QGroupBox("Relacionamentos detectados")
-        layout_rel = QVBoxLayout(grupo_relacionamentos)
-        self.texto_relacionamentos = QTextEdit()
-        self.texto_relacionamentos.setReadOnly(True)
-        self.texto_relacionamentos.setMinimumHeight(240)
-        self.texto_relacionamentos.setMinimumWidth(0)
-        self.texto_relacionamentos.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.texto_relacionamentos.setStyleSheet(
-            "QTextEdit {"
-            " background-color: #0f172a;"
-            " color: #e2e8f0;"
-            " border-radius: 10px;"
-            " border: 1px solid rgba(148, 163, 184, 0.35);"
-            " padding: 12px;"
-            " font-family: 'JetBrains Mono', 'Fira Code', monospace;"
-            " font-size: 13px;"
-            " line-height: 1.55;"
-            " }\n"
-            " QTextEdit QScrollBar:vertical {width: 10px;}"
-        )
-        layout_rel.addWidget(self.texto_relacionamentos)
-
-        grupo_ajuda = QGroupBox("Formato do arquivo .txt")
-        layout_ajuda = QVBoxLayout(grupo_ajuda)
-        self.texto_ajuda = QTextEdit()
-        self.texto_ajuda.setReadOnly(True)
-        self.texto_ajuda.setHtml(self._gerar_texto_ajuda())
-        layout_ajuda.addWidget(self.texto_ajuda)
-
         botao_exportar = QPushButton("Exportar visualização…")
         botao_exportar.clicked.connect(self._exportar_imagem)
 
@@ -390,8 +367,6 @@ class VisualizadorBipartido(QMainWindow):
         layout.addWidget(botoes_layout)
         layout.addWidget(self.rotulo_arquivo)
         layout.addWidget(grupo_resumo)
-        layout.addWidget(grupo_relacionamentos)
-        layout.addWidget(grupo_ajuda)
         botao_animacao = QPushButton("Ver animação do algoritmo")
         botao_animacao.clicked.connect(self._mostrar_animacao)
 
@@ -405,6 +380,80 @@ class VisualizadorBipartido(QMainWindow):
         scroll.setWidget(painel)
         scroll.setObjectName("ScrollPainel")
         return scroll
+
+    def _criar_aba_relacionamentos(self) -> QWidget:
+        conteudo = QWidget()
+        layout = QVBoxLayout(conteudo)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(16)
+
+        descricao = QLabel(
+            "Explore as relações detectadas no grafo carregado. As conexões são "
+            "organizadas por partição e destacam possíveis conflitos."
+        )
+        descricao.setWordWrap(True)
+        descricao.setStyleSheet("font-size: 14px; color: #e2e8f0; line-height: 1.5;")
+
+        self.texto_relacionamentos = QTextEdit()
+        self.texto_relacionamentos.setReadOnly(True)
+        self.texto_relacionamentos.setMinimumHeight(360)
+        self.texto_relacionamentos.setObjectName("PainelRelacionamentos")
+        self.texto_relacionamentos.setStyleSheet(
+            "QTextEdit#PainelRelacionamentos {"
+            " background-color: rgba(248, 250, 252, 0.98);"
+            " color: #0f172a;"
+            " border-radius: 14px;"
+            " border: 1px solid rgba(15, 23, 42, 0.18);"
+            " padding: 18px 22px;"
+            " font-family: 'Inter', 'Segoe UI', sans-serif;"
+            " font-size: 13px;"
+            " line-height: 1.6;"
+            " }"
+            "QTextEdit#PainelRelacionamentos QScrollBar:vertical {width: 12px;}"
+        )
+
+        layout.addWidget(descricao)
+        layout.addWidget(self.texto_relacionamentos)
+        return conteudo
+
+    def _criar_aba_formato_arquivo(self) -> QWidget:
+        conteudo = QWidget()
+        layout = QVBoxLayout(conteudo)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(16)
+
+        titulo = QLabel("Guia rápido do formato .txt")
+        titulo.setStyleSheet("font-size: 18px; font-weight: 600; color: #f8fafc;")
+
+        descricao = QLabel(
+            "Consulte esta referência para montar seus próprios arquivos de grafo."
+        )
+        descricao.setWordWrap(True)
+        descricao.setStyleSheet("font-size: 14px; color: #e2e8f0; line-height: 1.5;")
+
+        self.texto_ajuda = QTextEdit()
+        self.texto_ajuda.setReadOnly(True)
+        self.texto_ajuda.setObjectName("PainelAjudaFormato")
+        self.texto_ajuda.setHtml(self._gerar_texto_ajuda())
+        self.texto_ajuda.setStyleSheet(
+            "QTextEdit#PainelAjudaFormato {"
+            " background-color: rgba(248, 250, 252, 0.95);"
+            " color: #0f172a;"
+            " border-radius: 14px;"
+            " border: 1px solid rgba(15, 23, 42, 0.18);"
+            " padding: 18px 22px;"
+            " font-family: 'JetBrains Mono', 'Fira Code', monospace;"
+            " font-size: 13px;"
+            " line-height: 1.6;"
+            " }"
+            "QTextEdit#PainelAjudaFormato QScrollBar:vertical {width: 12px;}"
+        )
+
+        layout.addWidget(titulo)
+        layout.addWidget(descricao)
+        layout.addWidget(self.texto_ajuda)
+        layout.addStretch(1)
+        return conteudo
 
     def _criar_aba_editor(self) -> QWidget:
         conteudo = QWidget()
@@ -855,6 +904,7 @@ class VisualizadorBipartido(QMainWindow):
             self._grafo, layout=self._layout_atual
         )
 
+        self.canvas.figure.patch.set_facecolor("#f8fafc")
         self.canvas.figure.clear()
         ax = self.canvas.figure.add_subplot(111)
         if self._layout_atual == "flechas":
@@ -893,6 +943,19 @@ class VisualizadorBipartido(QMainWindow):
             verticalalignment="bottom",
             bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="none", alpha=0.85),
         )
+
+        if posicoes:
+            xs = [coord[0] for coord in posicoes.values()]
+            ys = [coord[1] for coord in posicoes.values()]
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+            largura = max(max_x - min_x, 1e-3)
+            altura = max(max_y - min_y, 1e-3)
+            margem_x = largura * 0.18
+            margem_y = altura * 0.18
+            ax.set_xlim(min_x - margem_x, max_x + margem_x)
+            ax.set_ylim(min_y - margem_y, max_y + margem_y)
+            ax.set_aspect("equal", adjustable="box")
 
         # Ajusta a ordem de desenho para manter os elementos visuais na hierarquia correta
         if isinstance(colecao_arestas, list):
@@ -1167,54 +1230,54 @@ larissa x filme_meu_vizinho_totoro</pre>
         estilos = dedent(
             """
             <style>
-            body {margin: 0; background-color: transparent; color: #e2e8f0; font-family: 'Inter', 'Segoe UI', sans-serif;}
-            .painel {display: flex; flex-direction: column; gap: 16px; padding: 8px 0 16px;}
-            .painel.vazio {min-height: 160px; align-items: center; justify-content: center; display: flex;}
-            .mensagem-vazia {margin: 0; padding: 20px; border-radius: 14px; background: rgba(15, 23, 42, 0.72);
-                             border: 1px solid rgba(148, 163, 184, 0.28); font-weight: 600; letter-spacing: 0.01em;}
-            .resumo {display: flex; flex-wrap: wrap; gap: 12px; background: rgba(15, 23, 42, 0.7);
-                     border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 16px; padding: 14px 16px;}
-            .resumo-item {display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px;
-                          background: rgba(30, 41, 59, 0.58); min-width: 120px;}
-            .resumo-item.destaque {background: rgba(248, 113, 113, 0.14); border: 1px solid rgba(248, 113, 113, 0.32);}
-            .resumo-numero {font-size: 22px; font-weight: 700; color: #f8fafc; line-height: 1.1;}
-            .resumo-item.destaque .resumo-numero {color: #fca5a5;}
-            .resumo-legenda {font-size: 12px; font-weight: 600; color: #cbd5f5; text-transform: uppercase; letter-spacing: 0.08em;}
-            .grupo {display: flex; flex-direction: column; gap: 0; border-radius: 18px; overflow: hidden;
-                    border: 1px solid rgba(148, 163, 184, 0.18); background: rgba(15, 23, 42, 0.64);}
-            .grupo-0 {border-color: rgba(59, 130, 246, 0.32);}
-            .grupo-1 {border-color: rgba(234, 88, 12, 0.32);}
+            body {margin: 0; background-color: transparent; color: #0f172a; font-family: 'Inter', 'Segoe UI', sans-serif;}
+            .painel {display: flex; flex-direction: column; gap: 24px; padding: 8px 0 24px;}
+            .painel.vazio {min-height: 200px; align-items: center; justify-content: center; display: flex;}
+            .mensagem-vazia {margin: 0; padding: 22px 26px; border-radius: 18px; background: #ffffff;
+                             border: 1px dashed rgba(15, 23, 42, 0.25); font-weight: 600; letter-spacing: 0.01em;}
+            .resumo {display: flex; flex-wrap: wrap; gap: 18px; background: #f1f5f9;
+                     border: 1px solid rgba(15, 23, 42, 0.12); border-radius: 18px; padding: 18px 20px;}
+            .resumo-item {display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-radius: 14px;
+                          background: #ffffff; min-width: 160px; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);}
+            .resumo-item.destaque {background: #fff7ed; border: 1px solid rgba(251, 146, 60, 0.35);}
+            .resumo-numero {font-size: 24px; font-weight: 700; color: #0f172a; line-height: 1.1;}
+            .resumo-item.destaque .resumo-numero {color: #ea580c;}
+            .resumo-legenda {font-size: 12px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.08em;}
+            .grupo {display: flex; flex-direction: column; gap: 0; border-radius: 20px; overflow: hidden;
+                    border: 1px solid rgba(15, 23, 42, 0.1); background: #ffffff; box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);}
+            .grupo-0 {border-color: rgba(37, 99, 235, 0.28);}
+            .grupo-1 {border-color: rgba(249, 115, 22, 0.32);}
             .grupo-cabecalho {display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start;
-                              gap: 10px; padding: 16px 18px; background: rgba(15, 23, 42, 0.78);}
+                              gap: 12px; padding: 20px 24px; background: rgba(241, 245, 249, 0.8);}
             .grupo-info {display: flex; flex-direction: column; gap: 6px; min-width: 0;}
-            .grupo-etiqueta {font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; color: #38bdf8;}
-            .grupo.grupo-1 .grupo-etiqueta {color: #fb923c;}
-            .grupo.grupo-outros .grupo-etiqueta {color: #cbd5f5;}
-            .grupo-descricao {font-size: 18px; font-weight: 600; color: #f8fafc; word-break: break-word;}
-            .grupo-resumo {font-size: 13px; font-weight: 600; color: #cbd5f5; background: rgba(15, 23, 42, 0.55);
-                          border-radius: 999px; padding: 6px 14px; border: 1px solid rgba(148, 163, 184, 0.28);}
-            .tabela-relacoes {width: 100%; border-collapse: collapse; background: rgba(15, 23, 42, 0.82);}
-            .tabela-relacoes thead {background: rgba(30, 41, 59, 0.8);}
-            .tabela-relacoes th {font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: #a5b4fc;}
-            .tabela-relacoes th, .tabela-relacoes td {padding: 14px 18px; border-bottom: 1px solid rgba(148, 163, 184, 0.16); vertical-align: top;}
+            .grupo-etiqueta {font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; color: #2563eb;}
+            .grupo.grupo-1 .grupo-etiqueta {color: #ea580c;}
+            .grupo.grupo-outros .grupo-etiqueta {color: #0f172a;}
+            .grupo-descricao {font-size: 18px; font-weight: 600; color: #0f172a; word-break: break-word;}
+            .grupo-resumo {font-size: 13px; font-weight: 600; color: #1e293b; background: #ffffff;
+                          border-radius: 999px; padding: 6px 16px; border: 1px solid rgba(15, 23, 42, 0.12);}
+            .tabela-relacoes {width: 100%; border-collapse: collapse; background: #ffffff;}
+            .tabela-relacoes thead {background: rgba(226, 232, 240, 0.7);}
+            .tabela-relacoes th {font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: #475569;}
+            .tabela-relacoes th, .tabela-relacoes td {padding: 16px 22px; border-bottom: 1px solid rgba(148, 163, 184, 0.25); vertical-align: top;}
             .tabela-relacoes tbody tr:last-child th, .tabela-relacoes tbody tr:last-child td {border-bottom: none;}
-            .col-origem {width: 26%; font-weight: 700; color: #f8fafc; word-break: break-word;}
-            .col-tipo {width: 20%; color: #e2e8f0; font-weight: 500;}
+            .col-origem {width: 26%; font-weight: 700; color: #0f172a; word-break: break-word;}
+            .col-tipo {width: 20%; color: #1e293b; font-weight: 500;}
             .col-relacoes {width: 54%;}
-            .lista-destinos {display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0;}
-            .lista-destinos.vazio {display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px;
-                                   border: 1px dashed rgba(148, 163, 184, 0.4); color: #cbd5f5; font-style: italic;}
-            .destino {display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12px;
-                      background: rgba(14, 116, 233, 0.15); border: 1px solid rgba(56, 189, 248, 0.28); color: #bae6fd;}
-            .destino::before {content: '•'; font-size: 14px; color: rgba(56, 189, 248, 0.9);}
-            .destino.conflito {background: rgba(248, 113, 113, 0.2); border-color: rgba(248, 113, 113, 0.36); color: #fecaca; font-weight: 600;}
-            .destino.conflito::before {content: '⚠'; color: #f87171;}
-            .contador {display: block; margin-top: 6px; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em;}
+            .lista-destinos {display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0;}
+            .lista-destinos.vazio {display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px;
+                                   border: 1px dashed rgba(148, 163, 184, 0.4); color: #475569; font-style: italic;}
+            .destino {display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; font-size: 12px;
+                      background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.26); color: #1d4ed8; font-weight: 600;}
+            .destino::before {content: '•'; font-size: 16px; color: rgba(59, 130, 246, 0.8);}
+            .destino.conflito {background: rgba(248, 113, 113, 0.18); border-color: rgba(248, 113, 113, 0.32); color: #b91c1c;}
+            .destino.conflito::before {content: '⚠'; color: #dc2626; font-size: 14px;}
+            .contador {display: block; margin-top: 8px; font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em;}
             @media (max-width: 720px) {
               .resumo {flex-direction: column;}
               .resumo-item {width: 100%;}
-              .grupo-cabecalho {padding: 14px;}
-              .tabela-relacoes th, .tabela-relacoes td {padding: 12px 14px;}
+              .grupo-cabecalho {padding: 16px;}
+              .tabela-relacoes th, .tabela-relacoes td {padding: 14px 16px;}
             }
             </style>
             """
