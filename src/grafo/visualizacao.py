@@ -412,11 +412,11 @@ def animar_verificacao(
 
         botao_fechar = Button(
             area_botao,
-            label="✕",
+            label="Fechar",
             color="#f1f5f9",
             hovercolor="#fee2e2",
         )
-        botao_fechar.label.set_fontsize(14)
+        botao_fechar.label.set_fontsize(11)
 
         def _fechar_animacao(_event: object) -> None:
             animacao.event_source.stop()
@@ -443,10 +443,10 @@ def animar_verificacao(
             pausado = bool(estado_animacao["pausado"])
             if pausado:
                 animacao.event_source.start()
-                botao_pausa.label.set_text("⏸")
+                botao_pausa.label.set_text("Pausar")
             else:
                 animacao.event_source.stop()
-                botao_pausa.label.set_text("▶")
+                botao_pausa.label.set_text("Retomar")
             estado_animacao["pausado"] = not pausado
             fig.canvas.draw_idle()
 
@@ -456,7 +456,7 @@ def animar_verificacao(
             indice_limitado = max(0, min(total_passos - 1, indice))
             animacao.event_source.stop()
             estado_animacao["pausado"] = True
-            botao_pausa.label.set_text("▶")
+            botao_pausa.label.set_text("Retomar")
             atualizar(indice_limitado)
             fig.canvas.draw_idle()
             proximo_indice = indice_limitado + 1 if indice_limitado < total_passos - 1 else indice_limitado
@@ -478,10 +478,10 @@ def animar_verificacao(
             intervalo_atual = float(estado_animacao["intervalo"])
             _definir_intervalo(intervalo_atual * 2.0)
 
-        largura_botao = 0.12
-        altura_botao = 0.065
-        espacamento = 0.015
-        x_inicial = 0.2
+        largura_botao = 0.16
+        altura_botao = 0.07
+        espacamento = 0.02
+        x_inicial = 0.16
         y_botao = 0.04
 
         def _criar_eixo(indice_botao: int) -> "plt.Axes":
@@ -504,20 +504,54 @@ def animar_verificacao(
         eixo_lento = _criar_eixo(3)
         eixo_rapido = _criar_eixo(4)
 
-        botao_voltar = Button(eixo_voltar, label="◀", color="#e2e8f0", hovercolor="#cbd5f5")
-        botao_pausa = Button(eixo_pausa, label="⏸", color="#e2e8f0", hovercolor="#cbd5f5")
-        botao_avancar = Button(eixo_avancar, label="▶", color="#e2e8f0", hovercolor="#cbd5f5")
-        botao_lento = Button(eixo_lento, label="−", color="#e2e8f0", hovercolor="#cbd5f5")
-        botao_rapido = Button(eixo_rapido, label="+", color="#e2e8f0", hovercolor="#cbd5f5")
+        botao_voltar = Button(
+            eixo_voltar,
+            label="Anterior",
+            color="#e2e8f0",
+            hovercolor="#cbd5f5",
+        )
+        botao_pausa = Button(
+            eixo_pausa,
+            label="Pausar",
+            color="#e2e8f0",
+            hovercolor="#cbd5f5",
+        )
+        botao_avancar = Button(
+            eixo_avancar,
+            label="Próximo",
+            color="#e2e8f0",
+            hovercolor="#cbd5f5",
+        )
+        botao_lento = Button(
+            eixo_lento,
+            label="- Veloc.",
+            color="#e2e8f0",
+            hovercolor="#cbd5f5",
+        )
+        botao_rapido = Button(
+            eixo_rapido,
+            label="+ Veloc.",
+            color="#e2e8f0",
+            hovercolor="#cbd5f5",
+        )
 
         for button in (botao_voltar, botao_pausa, botao_avancar, botao_lento, botao_rapido):
-            button.label.set_fontsize(12)
+            button.label.set_fontsize(10)
 
         botao_voltar.on_clicked(_voltar)
         botao_pausa.on_clicked(_pausar_retomar)
         botao_avancar.on_clicked(_avancar)
         botao_lento.on_clicked(_desacelerar)
         botao_rapido.on_clicked(_acelerar)
+
+        estado_animacao["_controles"] = {
+            "botao_fechar": botao_fechar,
+            "botao_voltar": botao_voltar,
+            "botao_pausa": botao_pausa,
+            "botao_avancar": botao_avancar,
+            "botao_lento": botao_lento,
+            "botao_rapido": botao_rapido,
+        }
 
         if total_passos == 0:
             botao_pausa.label.set_text("—")
