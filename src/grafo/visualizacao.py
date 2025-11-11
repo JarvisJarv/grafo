@@ -17,6 +17,28 @@ except ImportError as exc:  # pragma: no cover - tratado pelo chamador
 Posicoes = Dict[str, Tuple[float, float]]
 
 
+def _ajustar_limites_eixo(eixo: "plt.Axes", posicoes: Posicoes, margem: float = 0.15) -> None:
+    """Garante espaço extra ao redor do grafo para evitar cortes em rótulos."""
+
+    if not posicoes:
+        return
+
+    xs = [coord[0] for coord in posicoes.values()]
+    ys = [coord[1] for coord in posicoes.values()]
+
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+
+    largura = max(max_x - min_x, 1e-3)
+    altura = max(max_y - min_y, 1e-3)
+
+    margem_x = largura * margem
+    margem_y = altura * margem
+
+    eixo.set_xlim(min_x - margem_x, max_x + margem_x)
+    eixo.set_ylim(min_y - margem_y, max_y + margem_y)
+
+
 def _deslocar_rotulos(posicoes: Posicoes, deslocamento: float = 0.085) -> Posicoes:
     """Move os rótulos ligeiramente para cima dos vértices."""
 
@@ -207,6 +229,8 @@ def exibir_grafo(
         bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="none", alpha=0.85),
     )
 
+    _ajustar_limites_eixo(eixo, posicoes_rotulos)
+
     eixo.set_axis_off()
 
     if titulo:
@@ -296,6 +320,8 @@ def animar_verificacao(
         verticalalignment="bottom",
         bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="none", alpha=0.85),
     )
+
+    _ajustar_limites_eixo(eixo_grafo, posicoes_rotulos)
 
     eixo_grafo.set_axis_off()
 
