@@ -11,6 +11,7 @@ from .bipartido import GrafoBipartido, PassoBiparticao, ResultadoBiparticao
 
 try:  # pragma: no cover - import opcional na ausência do matplotlib
     import matplotlib.pyplot as plt
+    from matplotlib import rcsetup
     from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
     from matplotlib.widgets import Button
 except ImportError as exc:  # pragma: no cover - tratado pelo chamador
@@ -19,6 +20,21 @@ except ImportError as exc:  # pragma: no cover - tratado pelo chamador
 Posicoes = Dict[str, Tuple[float, float]]
 
 _ANIMACOES_ATIVAS: List[FuncAnimation] = []
+
+
+def _backend_interativo() -> bool:
+    """Retorna ``True`` quando o backend atual suporta janelas interativas."""
+
+    backend = plt.get_backend()
+    if not backend:
+        return False
+
+    backend_normalizado = backend.lower()
+    if backend_normalizado.startswith("module://"):
+        return False
+
+    interativos = {nome.lower() for nome in rcsetup.interactive_bk}
+    return backend_normalizado in interativos
 
 
 def _registrar_animacao_ativa(figura: "plt.Figure", animacao: FuncAnimation) -> None:
@@ -306,6 +322,15 @@ def animar_verificacao(
     intervalo_ms: int = 600,
 ) -> FuncAnimation:
     """Cria uma animação destacando as etapas da verificação do grafo."""
+
+    if mostrar and not _backend_interativo():
+        backend = plt.get_backend() or "desconhecido"
+        raise RuntimeError(
+            "O backend do Matplotlib não suporta janelas interativas. "
+            "Instale um backend com suporte a GUI (por exemplo, 'pip install matplotlib[qt]' ou 'pip install pyqt5') "
+            "ou utilize --exportar-animacao para gerar um arquivo. "
+            f"Backend atual: {backend}."
+        )
 
     resultado, passos = grafo.verificar_biparticao_com_passos()
     grafo_nx, posicoes, _, _, _ = preparar_desenho(grafo, layout=layout)
