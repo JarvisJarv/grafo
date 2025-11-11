@@ -13,6 +13,7 @@ try:  # pragma: no cover - import opcional na ausência do matplotlib
     import matplotlib.pyplot as plt
     from matplotlib import rcsetup
     from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
+    from matplotlib.patches import Rectangle
     from matplotlib.widgets import Button
 except ImportError as exc:  # pragma: no cover - tratado pelo chamador
     raise
@@ -335,32 +336,48 @@ def animar_verificacao(
     resultado, passos = grafo.verificar_biparticao_com_passos()
     grafo_nx, posicoes, _, _, _ = preparar_desenho(grafo, layout=layout)
 
+    cores_base_vertices = _cores_vertices(resultado)
+    cores_iniciais_vertices = (
+        _cores_vertices_passo(grafo_nx, passos[0])
+        if passos
+        else [cores_base_vertices.get(vertice, "tab:gray") for vertice in grafo_nx.nodes]
+    )
+    cores_iniciais_arestas = (
+        _cores_arestas_passo(grafo_nx, passos[0])
+        if passos
+        else list(_cores_arestas_lista(grafo_nx.edges, resultado))
+    )
+
     fig = plt.figure(figsize=(12, 7))
+    fig.patch.set_facecolor("#f8fafc")
     grade = fig.add_gridspec(
         2,
         2,
-        height_ratios=[3.5, 1.0],
-        width_ratios=[3.6, 1.6],
-        hspace=0.35,
+        height_ratios=[3.6, 1.4],
+        width_ratios=[3.8, 1.9],
+        hspace=0.32,
         wspace=0.3,
     )
     eixo_grafo = fig.add_subplot(grade[0, 0])
     eixo_info = fig.add_subplot(grade[0, 1])
-    eixo_legenda = fig.add_subplot(grade[1, :])
-    fig.patch.set_facecolor("#f8fafc")
+    eixo_legenda = fig.add_subplot(grade[1, 0])
+    eixo_status = fig.add_subplot(grade[1, 1])
+
+    eixo_grafo.set_facecolor("#f1f5f9")
     eixo_info.set_facecolor("#e2e8f0")
+    eixo_status.set_facecolor("#e2e8f0")
+    eixo_legenda.set_facecolor("#f1f5f9")
+
     colecao_arestas = nx.draw_networkx_edges(grafo_nx, posicoes, ax=eixo_grafo, width=2)
     colecao_vertices = nx.draw_networkx_nodes(
         grafo_nx,
         posicoes,
         ax=eixo_grafo,
-        node_color=_cores_vertices_passo(grafo_nx, passos[0]) if passos else "tab:gray",
+        node_color=cores_iniciais_vertices,
         node_size=900,
         linewidths=1.5,
         edgecolors="black",
     )
-    colecao_arestas.set_animated(True)
-    colecao_vertices.set_animated(True)
     posicoes_rotulos = _deslocar_rotulos(posicoes)
     nx.draw_networkx_labels(
         grafo_nx,
@@ -376,7 +393,7 @@ def animar_verificacao(
     eixo_grafo.set_axis_off()
 
     if titulo:
-        eixo_grafo.set_title(titulo)
+        eixo_grafo.set_title(titulo, fontsize=14, pad=12)
 
     particao_a, particao_b = resultado.particoes
     elementos_legenda = [
@@ -395,38 +412,97 @@ def animar_verificacao(
     )
 
     eixo_info.set_axis_off()
-    eixo_info.set_xlim(0, 1)
-    eixo_info.set_ylim(0, 1)
-
+    texto_inicial = (
+        _formatar_texto_passo(passos[0])
+        if passos
+        else "Nenhum passo intermediário foi necessário para classificar o grafo."
+    )
     texto_info = eixo_info.text(
         0.5,
         0.5,
-        _formatar_texto_passo(passos[0]) if passos else "",
+        texto_inicial,
         transform=eixo_info.transAxes,
         verticalalignment="center",
         horizontalalignment="center",
         wrap=True,
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.95),
+        fontsize=11,
+        color="#0f172a",
+        bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#cbd5f5", alpha=0.98),
     )
-    texto_info.set_animated(True)
 
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            "This figure includes Axes that are not compatible with tight_layout",
-            UserWarning,
-        )
-        plt.tight_layout()
+    eixo_status.set_axis_off()
+    barra_fundo = Rectangle(
+        (0.12, 0.34),
+        0.76,
+        0.18,
+        transform=eixo_status.transAxes,
+        facecolor="#dbeafe",
+        edgecolor="none",
+        alpha=0.9,
+    )
+    barra_progresso = Rectangle(
+        (0.12, 0.34),
+        0.0,
+        0.18,
+        transform=eixo_status.transAxes,
+        facecolor="#2563eb",
+        edgecolor="none",
+        alpha=0.9,
+    )
+    eixo_status.add_patch(barra_fundo)
+    eixo_status.add_patch(barra_progresso)
+    texto_etapa = eixo_status.text(
+        0.5,
+        0.72,
+        "",
+        ha="center",
+        va="center",
+        fontsize=13,
+        fontweight="bold",
+        color="#0f172a",
+        transform=eixo_status.transAxes,
+    )
+    texto_velocidade = eixo_status.text(
+        0.5,
+        0.16,
+        "Velocidade: 1.0×",
+        ha="center",
+        va="center",
+        fontsize=10,
+        color="#334155",
+        transform=eixo_status.transAxes,
+    )
 
     intervalo_base = max(1, intervalo_ms)
-    estado_animacao: dict[str, object] = {
+    estado_animacao: dict[str, Any] = {
         "indice_atual": 0,
         "pausado": False,
         "intervalo": float(intervalo_base),
         "intervalo_base": float(intervalo_base),
+        "total_passos": len(passos),
     }
 
+    def _atualizar_indicadores() -> None:
+        total = int(estado_animacao["total_passos"])
+        indice = int(estado_animacao["indice_atual"])
+        if total:
+            indice = max(0, min(indice, total - 1))
+            texto_etapa.set_text(f"Etapa {indice + 1}/{total}")
+            progresso = (indice + 1) / total
+        else:
+            texto_etapa.set_text("Nenhuma etapa disponível")
+            progresso = 0.0
+        barra_progresso.set_width(0.76 * progresso)
+        velocidade_relativa = estado_animacao["intervalo_base"] / max(estado_animacao["intervalo"], 1e-9)
+        texto_velocidade.set_text(f"Velocidade: {velocidade_relativa:.1f}×")
+        fig.canvas.draw_idle()
+
     def atualizar(indice: int) -> Sequence[object]:
+        if not passos:
+            estado_animacao["indice_atual"] = 0
+            _atualizar_indicadores()
+            return colecao_vertices, colecao_arestas, texto_info
+
         passo = passos[indice]
         cores_vertices = _cores_vertices_passo(grafo_nx, passo)
         colecao_vertices.set_facecolor(cores_vertices)
@@ -435,22 +511,31 @@ def animar_verificacao(
         texto_info.set_text(_formatar_texto_passo(passo))
         estado_animacao["indice_atual"] = indice
         if titulo:
-            eixo_grafo.set_title(f"{titulo} — etapa {indice + 1}/{len(passos)}")
+            eixo_grafo.set_title(f"{titulo} — etapa {indice + 1}/{len(passos)}", fontsize=14, pad=12)
+        _atualizar_indicadores()
         return colecao_vertices, colecao_arestas, texto_info
 
     def inicializar() -> Sequence[object]:
+        colecao_vertices.set_facecolor(cores_iniciais_vertices)
+        colecao_arestas.set_color(cores_iniciais_arestas)
         if passos:
-            cores_iniciais = _cores_vertices_passo(grafo_nx, passos[0])
-            colecao_vertices.set_facecolor(cores_iniciais)
-            cores_arestas_iniciais = _cores_arestas_passo(grafo_nx, passos[0])
-            colecao_arestas.set_color(cores_arestas_iniciais)
             texto_info.set_text(_formatar_texto_passo(passos[0]))
+            estado_animacao["indice_atual"] = 0
+        else:
+            estado_animacao["indice_atual"] = 0
+        _atualizar_indicadores()
         return colecao_vertices, colecao_arestas, texto_info
+
+    sequencia_frames: Iterable[int]
+    if passos:
+        sequencia_frames = range(len(passos))
+    else:
+        sequencia_frames = [0]
 
     animacao = FuncAnimation(
         fig,
         atualizar,
-        frames=len(passos),
+        frames=sequencia_frames,
         interval=intervalo_base,
         repeat=False,
         init_func=inicializar,
@@ -460,39 +545,15 @@ def animar_verificacao(
     _registrar_animacao_ativa(fig, animacao)
     setattr(fig, "_animacao_ref", animacao)
 
+    fig.subplots_adjust(top=0.92, bottom=0.2)
+
     if mostrar:
-        fig.subplots_adjust(top=0.9, bottom=0.18)
-
-        area_botao = fig.add_axes([0.84, 0.88, 0.12, 0.08])
-        area_botao.set_anchor("NE")
-        area_botao.set_facecolor("#fee2e2")
-        for spine in area_botao.spines.values():
+        painel_controles = fig.add_axes([0.08, 0.04, 0.84, 0.12])
+        painel_controles.set_facecolor("#e2e8f0")
+        painel_controles.set_xticks([])
+        painel_controles.set_yticks([])
+        for spine in painel_controles.spines.values():
             spine.set_visible(False)
-
-        botao_fechar = Button(
-            area_botao,
-            label="✕ Fechar",
-            color="#fee2e2",
-            hovercolor="#fecaca",
-        )
-        botao_fechar.label.set_fontsize(12)
-        botao_fechar.label.set_color("#7f1d1d")
-
-        def _fechar_animacao(_event: object) -> None:
-            _parar_animacao()
-            plt.close(fig)
-
-        botao_fechar.on_clicked(_fechar_animacao)
-
-        total_passos = len(passos)
-        texto_velocidade = fig.text(
-            0.5,
-            0.04,
-            "Velocidade: 1.0×",
-            ha="center",
-            va="center",
-            fontsize=10,
-        )
 
         def _event_source() -> Any:
             return getattr(animacao, "event_source", None)
@@ -505,151 +566,151 @@ def animar_verificacao(
         def _iniciar_animacao() -> None:
             event_source = _event_source()
             if event_source is not None:
+                event_source.interval = int(max(1.0, estado_animacao["intervalo"]))
                 event_source.start()
-
-        def _atualizar_intervalo_event_source(intervalo_ajustado: float) -> None:
-            event_source = _event_source()
-            if event_source is not None:
-                event_source.interval = int(intervalo_ajustado)
 
         def _definir_intervalo(novo_intervalo: float) -> None:
             limite_inferior = 30.0
             limite_superior = 5000.0
             intervalo_ajustado = max(limite_inferior, min(limite_superior, novo_intervalo))
             estado_animacao["intervalo"] = intervalo_ajustado
-            _atualizar_intervalo_event_source(intervalo_ajustado)
-            fator = estado_animacao["intervalo_base"] / intervalo_ajustado
-            texto_velocidade.set_text(f"Velocidade: {fator:.1f}×")
-            fig.canvas.draw_idle()
+            _atualizar_indicadores()
+            event_source = _event_source()
+            if event_source is not None:
+                event_source.interval = int(intervalo_ajustado)
 
-        def _pausar_retomar(_event: object) -> None:
-            if total_passos == 0:
-                return
-            pausado = bool(estado_animacao["pausado"])
-            if pausado:
-                _iniciar_animacao()
-                botao_pausa.label.set_text("Pausar")
-            else:
-                _parar_animacao()
-                botao_pausa.label.set_text("Despausar")
-            estado_animacao["pausado"] = not pausado
-            fig.canvas.draw_idle()
-
-        def _mostrar_passo(indice: int) -> None:
-            if total_passos == 0:
-                return
-            indice_limitado = max(0, min(total_passos - 1, indice))
-            _parar_animacao()
+        def _pausar() -> None:
             estado_animacao["pausado"] = True
-            botao_pausa.label.set_text("Despausar")
-            atualizar(indice_limitado)
-            fig.canvas.draw_idle()
-            proximo_indice = indice_limitado + 1 if indice_limitado < total_passos - 1 else indice_limitado
-            animacao.frame_seq = iter(range(proximo_indice, total_passos))
+            _parar_animacao()
 
-        def _avancar(_event: object) -> None:
+        def _retomar() -> None:
+            if not passos:
+                return
+            total = len(passos)
             indice_atual = int(estado_animacao["indice_atual"])
-            _mostrar_passo(indice_atual + 1)
+            if indice_atual >= total - 1:
+                animacao.frame_seq = iter(range(total))
+                animacao._draw_frame(0)
+                estado_animacao["indice_atual"] = 0
+            else:
+                animacao.frame_seq = iter(range(indice_atual + 1, total))
+            estado_animacao["pausado"] = False
+            botao_pausa.label.set_text("⏸ Pausar")
+            _atualizar_indicadores()
+            _iniciar_animacao()
+
+        def _mostrar_indice(indice: int) -> None:
+            if not passos:
+                return
+            indice_clamp = max(0, min(indice, len(passos) - 1))
+            animacao._draw_frame(indice_clamp)
+            estado_animacao["indice_atual"] = indice_clamp
+            animacao.frame_seq = iter(range(min(indice_clamp + 1, len(passos)), len(passos)))
+            _atualizar_indicadores()
 
         def _voltar(_event: object) -> None:
-            indice_atual = int(estado_animacao["indice_atual"])
-            _mostrar_passo(indice_atual - 1)
+            _pausar()
+            if passos:
+                _mostrar_indice(int(estado_animacao["indice_atual"]) - 1)
+            botao_pausa.label.set_text("▶ Reproduzir")
+
+        def _avancar(_event: object) -> None:
+            _pausar()
+            if passos:
+                _mostrar_indice(int(estado_animacao["indice_atual"]) + 1)
+            botao_pausa.label.set_text("▶ Reproduzir")
+
+        def _reiniciar(_event: object) -> None:
+            _pausar()
+            if passos:
+                _mostrar_indice(0)
+            botao_pausa.label.set_text("▶ Reproduzir")
+
+        def _pausar_retomar(_event: object) -> None:
+            if not passos:
+                return
+            if estado_animacao["pausado"]:
+                _retomar()
+            else:
+                _pausar()
+                botao_pausa.label.set_text("▶ Reproduzir")
 
         def _acelerar(_event: object) -> None:
             intervalo_atual = float(estado_animacao["intervalo"])
-            _definir_intervalo(intervalo_atual * 0.5)
+            _definir_intervalo(intervalo_atual * 0.7)
 
         def _desacelerar(_event: object) -> None:
             intervalo_atual = float(estado_animacao["intervalo"])
-            _definir_intervalo(intervalo_atual * 2.0)
+            _definir_intervalo(intervalo_atual * 1.5)
 
-        largura_botao = 0.14
-        altura_botao = 0.075
-        espacamento = 0.025
-        x_inicial = 0.14
-        y_botao = 0.06
-
-        painel_controles = fig.add_axes([0.08, 0.01, 0.84, 0.13])
-        painel_controles.set_facecolor("#f1f5f9")
-        painel_controles.set_xticks([])
-        painel_controles.set_yticks([])
-        for spine in painel_controles.spines.values():
-            spine.set_visible(False)
+        painel_pos = painel_controles.get_position()
+        painel_x0, painel_y0 = painel_pos.x0, painel_pos.y0
+        painel_largura, painel_altura = painel_pos.width, painel_pos.height
+        largura_relativa = 0.14
+        altura_relativa = 0.6
+        espacamento_relativo = 0.02
+        x_inicial_relativo = 0.02
+        y_relativo = 0.2
 
         def _criar_eixo(indice_botao: int) -> "plt.Axes":
-            eixo = fig.add_axes(
-                [
-                    x_inicial + indice_botao * (largura_botao + espacamento),
-                    y_botao,
-                    largura_botao,
-                    altura_botao,
-                ]
-            )
-            eixo.set_facecolor("#e2e8f0")
+            deslocamento = x_inicial_relativo + indice_botao * (largura_relativa + espacamento_relativo)
+            x = painel_x0 + deslocamento * painel_largura
+            y = painel_y0 + y_relativo * painel_altura
+            largura = largura_relativa * painel_largura
+            altura = altura_relativa * painel_altura
+            eixo = fig.add_axes([x, y, largura, altura])
+            eixo.set_facecolor("#f8fafc")
             for spine in eixo.spines.values():
                 spine.set_visible(False)
+            eixo.set_xticks([])
+            eixo.set_yticks([])
             return eixo
 
-        eixo_voltar = _criar_eixo(0)
-        eixo_pausa = _criar_eixo(1)
-        eixo_avancar = _criar_eixo(2)
-        eixo_lento = _criar_eixo(3)
-        eixo_rapido = _criar_eixo(4)
+        botoes_config = [
+            ("⏮ Reiniciar", _reiniciar),
+            ("◀ Anterior", _voltar),
+            ("⏸ Pausar", _pausar_retomar),
+            ("▶ Próximo", _avancar),
+            ("－ Lento", _desacelerar),
+            ("＋ Rápido", _acelerar),
+        ]
 
-        botao_voltar = Button(
-            eixo_voltar,
-            label="Anterior",
-            color="#e2e8f0",
-            hovercolor="#cbd5f5",
-        )
-        botao_pausa = Button(
-            eixo_pausa,
-            label="Pausar",
-            color="#e2e8f0",
-            hovercolor="#cbd5f5",
-        )
-        botao_avancar = Button(
-            eixo_avancar,
-            label="Próximo",
-            color="#e2e8f0",
-            hovercolor="#cbd5f5",
-        )
-        botao_lento = Button(
-            eixo_lento,
-            label="- Veloc.",
-            color="#e2e8f0",
-            hovercolor="#cbd5f5",
-        )
-        botao_rapido = Button(
-            eixo_rapido,
-            label="+ Veloc.",
-            color="#e2e8f0",
-            hovercolor="#cbd5f5",
-        )
+        botoes: list[Button] = []
+        for indice_botao, (rotulo, callback) in enumerate(botoes_config):
+            eixo_botao = _criar_eixo(indice_botao)
+            botao = Button(eixo_botao, label=rotulo, color="#f8fafc", hovercolor="#cbd5f5")
+            botao.label.set_fontsize(11)
+            botao.label.set_color("#0f172a")
+            botao.on_clicked(callback)
+            botoes.append(botao)
 
-        for button in (botao_voltar, botao_pausa, botao_avancar, botao_lento, botao_rapido):
-            button.label.set_fontsize(11)
-            button.label.set_color("#0f172a")
+        botao_reiniciar, botao_voltar, botao_pausa, botao_avancar, botao_lento, botao_rapido = botoes
 
-        botao_voltar.on_clicked(_voltar)
-        botao_pausa.on_clicked(_pausar_retomar)
-        botao_avancar.on_clicked(_avancar)
-        botao_lento.on_clicked(_desacelerar)
-        botao_rapido.on_clicked(_acelerar)
+        area_botao_fechar = fig.add_axes([0.86, 0.9, 0.1, 0.06])
+        area_botao_fechar.set_facecolor("#fee2e2")
+        for spine in area_botao_fechar.spines.values():
+            spine.set_visible(False)
+        botao_fechar = Button(
+            area_botao_fechar,
+            label="✕ Fechar",
+            color="#fee2e2",
+            hovercolor="#fecaca",
+        )
+        botao_fechar.label.set_fontsize(12)
+        botao_fechar.label.set_color("#7f1d1d")
 
-        estado_animacao["_controles"] = {
-            "botao_fechar": botao_fechar,
-            "botao_voltar": botao_voltar,
-            "botao_pausa": botao_pausa,
-            "botao_avancar": botao_avancar,
-            "botao_lento": botao_lento,
-            "botao_rapido": botao_rapido,
-        }
+        def _fechar_animacao(_event: object) -> None:
+            _pausar()
+            plt.close(fig)
 
-        if total_passos == 0:
+        botao_fechar.on_clicked(_fechar_animacao)
+
+        if not passos:
+            for botao in (botao_reiniciar, botao_voltar, botao_pausa, botao_avancar, botao_lento, botao_rapido):
+                botao.label.set_color("#94a3b8")
             botao_pausa.label.set_text("—")
-            for button in (botao_voltar, botao_avancar, botao_lento, botao_rapido):
-                button.label.set_color("#94a3b8")
+        else:
+            botao_pausa.label.set_text("⏸ Pausar")
 
     if caminho_saida:
         caminho = Path(caminho_saida)
@@ -677,4 +738,3 @@ def animar_verificacao(
         plt.close(fig)
 
     return animacao
-
