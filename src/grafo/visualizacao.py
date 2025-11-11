@@ -11,6 +11,7 @@ from .bipartido import GrafoBipartido, PassoBiparticao, ResultadoBiparticao
 try:  # pragma: no cover - import opcional na ausência do matplotlib
     import matplotlib.pyplot as plt
     from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
+    from matplotlib.widgets import Button
 except ImportError as exc:  # pragma: no cover - tratado pelo chamador
     raise
 
@@ -335,6 +336,25 @@ def animar_verificacao(
     texto_info.set_animated(True)
 
     plt.tight_layout()
+
+    if mostrar:
+        area_botao = fig.add_axes([0.92, 0.9, 0.06, 0.08])
+        area_botao.set_anchor("NE")
+        for spine in area_botao.spines.values():
+            spine.set_visible(False)
+
+        botao_fechar = Button(
+            area_botao,
+            label="✕",
+            color="#f1f5f9",
+            hovercolor="#fee2e2",
+        )
+        botao_fechar.label.set_fontsize(14)
+
+        def _fechar_animacao(_event: object) -> None:
+            plt.close(fig)
+
+        botao_fechar.on_clicked(_fechar_animacao)
 
     def atualizar(indice: int) -> Sequence[object]:
         passo = passos[indice]
