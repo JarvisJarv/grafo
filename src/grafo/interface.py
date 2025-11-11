@@ -9,14 +9,18 @@ from textwrap import dedent
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import networkx as nx
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import (
+    FigureCanvasQTAgg as FigureCanvas,
+    NavigationToolbar2QT as NavigationToolbar,
+)
 from matplotlib.animation import FuncAnimation
 from matplotlib.figure import Figure
 from matplotlib.patches import Ellipse, FancyArrowPatch
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
     QComboBox,
     QFileDialog,
     QFormLayout,
@@ -89,6 +93,166 @@ class CanvasGrafo(FigureCanvas):
         self.updateGeometry()
 
 
+class DialogoAnimacao(QDialog):
+    """Janela dedicada para apresentar a animação do algoritmo."""
+
+    def __init__(
+        self,
+        parent: Optional[QWidget],
+        animacao: FuncAnimation,
+        canvas: FigureCanvas,
+        titulo: str,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(titulo)
+        self.setModal(False)
+        self.resize(1280, 820)
+        self.setObjectName("DialogoAnimacao")
+
+        self._animacao = animacao
+        self._canvas = canvas
+        self._controles: Dict[str, object] = getattr(animacao, "_controles_externos", {})
+        self._estado: Dict[str, object] = self._controles.get("estado", {}) or {}
+
+        layout_principal = QVBoxLayout(self)
+        layout_principal.setContentsMargins(20, 20, 20, 20)
+        layout_principal.setSpacing(16)
+
+        rotulo_titulo = QLabel(titulo)
+        rotulo_titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        rotulo_titulo.setStyleSheet(
+            "font-size: 20px; font-weight: 600; color: #0f172a; letter-spacing: 0.5px;"
+        )
+
+        barra_ferramentas = NavigationToolbar(canvas, self)
+        barra_ferramentas.setStyleSheet(
+            "background-color: rgba(15, 23, 42, 0.85); color: #e2e8f0; border-radius: 6px;"
+        )
+
+        layout_principal.addWidget(rotulo_titulo)
+        layout_principal.addWidget(barra_ferramentas)
+        layout_principal.addWidget(canvas, stretch=1)
+
+        area_controles = QHBoxLayout()
+        area_controles.setSpacing(12)
+
+        self.botao_reiniciar = self._criar_botao("⏮ Reiniciar", "reiniciar")
+        self.botao_voltar = self._criar_botao("◀ Anterior", "voltar")
+        self.botao_pausar = self._criar_botao("⏸ Pausar", "alternar_pausa")
+        self.botao_avancar = self._criar_botao("Próximo ▶", "avancar")
+        self.botao_lento = self._criar_botao("− Velocidade", "mais_lento")
+        self.botao_rapido = self._criar_botao("+ Velocidade", "mais_rapido")
+
+        for botao in (
+            self.botao_reiniciar,
+            self.botao_voltar,
+            self.botao_pausar,
+            self.botao_avancar,
+            self.botao_lento,
+            self.botao_rapido,
+        ):
+            area_controles.addWidget(botao)
+
+        area_controles.addStretch(1)
+
+        self.rotulo_status = QLabel()
+        self.rotulo_status.setObjectName("RotuloStatusAnimacao")
+        self.rotulo_status.setStyleSheet("font-size: 14px; color: #334155; font-weight: 500;")
+        area_controles.addWidget(self.rotulo_status)
+
+        botao_fechar = QPushButton("Fechar")
+        botao_fechar.setObjectName("BotaoFecharAnimacao")
+        botao_fechar.clicked.connect(self.close)
+        botao_fechar.setStyleSheet(
+            "QPushButton {"
+            " background-color: #ef4444;"
+            " color: white;"
+            " border-radius: 8px;"
+            " padding: 8px 18px;"
+            " font-weight: 600;"
+            "}"
+            "QPushButton:hover {background-color: #dc2626;}"
+        )
+        area_controles.addWidget(botao_fechar)
+
+        layout_principal.addLayout(area_controles)
+
+        total_passos = int(self._controles.get("total_passos", 0) or 0)
+        if total_passos == 0:
+            for botao in (
+                self.botao_reiniciar,
+                self.botao_voltar,
+                self.botao_pausar,
+                self.botao_avancar,
+                self.botao_lento,
+                self.botao_rapido,
+            ):
+                botao.setEnabled(False)
+
+        self._timer_status = QTimer(self)
+        self._timer_status.setInterval(160)
+        self._timer_status.timeout.connect(self._atualizar_status)
+        self._timer_status.start()
+        self._atualizar_status()
+
+        self.setStyleSheet(
+            "#DialogoAnimacao {background-color: #f8fafc;}"
+            "QPushButton {"
+            " background-color: #1d4ed8;"
+            " color: white;"
+            " border-radius: 8px;"
+            " padding: 8px 18px;"
+            " font-weight: 600;"
+            "}"
+            "QPushButton:hover {background-color: #2563eb;}"
+        )
+
+    # ------------------------------------------------------------------
+    # Utilidades internas
+    # ------------------------------------------------------------------
+    def _criar_botao(self, texto: str, acao: str) -> QPushButton:
+        botao = QPushButton(texto)
+        botao.clicked.connect(lambda _=False, nome=acao: self._executar_controle(nome))
+        return botao
+
+    def _executar_controle(self, nome: str) -> None:
+        controle = self._controles.get(nome)
+        if callable(controle):
+            controle()
+            if self._canvas.figure.canvas is not None:
+                self._canvas.figure.canvas.draw_idle()
+        self._atualizar_status()
+
+    def _atualizar_status(self) -> None:
+        estado = self._estado
+        total_passos = int(self._controles.get("total_passos", estado.get("total_passos", 0)) or 0)
+        indice_atual = int(estado.get("indice_atual", -1))
+        if total_passos:
+            etapa = max(1, indice_atual + 1)
+            texto_etapa = f"Etapa {min(etapa, total_passos)}/{total_passos}"
+        else:
+            texto_etapa = "Nenhum passo disponível"
+
+        intervalo_base = float(self._controles.get("intervalo_base", estado.get("intervalo_base", 1.0)) or 1.0)
+        intervalo_atual = float(estado.get("intervalo", intervalo_base) or intervalo_base)
+        fator = intervalo_base / intervalo_atual if intervalo_atual else 1.0
+        self.rotulo_status.setText(f"{texto_etapa} · Velocidade {fator:.2f}×")
+
+        pausado = bool(estado.get("pausado", False))
+        self.botao_pausar.setText("▶ Reproduzir" if pausado else "⏸ Pausar")
+
+    # ------------------------------------------------------------------
+    # Eventos
+    # ------------------------------------------------------------------
+    def closeEvent(self, event: QCloseEvent) -> None:  # pragma: no cover - interface
+        self._timer_status.stop()
+        pausar = self._controles.get("pausar")
+        if callable(pausar):
+            pausar()
+        if self._canvas.figure.canvas is not None:
+            self._canvas.figure.canvas.close_event()
+        super().closeEvent(event)
+
 class VisualizadorBipartido(QMainWindow):
     """Janela principal para visualização dos grafos."""
 
@@ -103,6 +267,7 @@ class VisualizadorBipartido(QMainWindow):
         self._layout_atual: str = "flechas"
         self._assinatura_conflitos: Optional[Tuple[Tuple[str, str], ...]] = None
         self._animacao_atual: Optional[FuncAnimation] = None
+        self._janela_animacao: Optional[DialogoAnimacao] = None
 
         self._aplicar_tema_moderno()
         self._criar_componentes()
@@ -401,26 +566,45 @@ class VisualizadorBipartido(QMainWindow):
         if self._arquivo_atual:
             titulo += f" — {self._arquivo_atual.name}"
 
+        if self._janela_animacao is not None:
+            self._janela_animacao.close()
+            self._janela_animacao = None
+
+        figura = Figure(figsize=(12, 7))
+        canvas_animacao = FigureCanvas(figura)
+
         try:
             animacao = animar_verificacao(
                 self._grafo,
                 layout=layout_animacao,
                 titulo=titulo,
-                mostrar=True,
+                mostrar=False,
                 fps=2,
                 intervalo_ms=600,
+                fig=figura,
+                integracao_qt=True,
             )
-            self._animacao_atual = animacao
-            figura = getattr(animacao, "_fig", None)
-            if figura is not None and figura.canvas is not None:
-                figura.canvas.mpl_connect(
-                    "close_event",
-                    lambda _event: setattr(self, "_animacao_atual", None),
-                )
         except RuntimeError as exc:  # pragma: no cover - interface
             self._mostrar_erro("Não foi possível exibir a animação", exc)
+            if figura.canvas is not None:
+                figura.canvas.close_event()
+            return
         except Exception as exc:  # pragma: no cover - interface
             self._mostrar_erro("Falha inesperada ao abrir a animação", exc)
+            if figura.canvas is not None:
+                figura.canvas.close_event()
+            return
+
+        self._animacao_atual = animacao
+        dialogo = DialogoAnimacao(self, animacao, canvas_animacao, titulo)
+        dialogo.destroyed.connect(lambda _obj=None: self._limpar_animacao_referencia())
+        dialogo.show()
+        self._janela_animacao = dialogo
+        self.statusBar().showMessage("Animação aberta em uma nova janela")
+
+    def _limpar_animacao_referencia(self) -> None:
+        self._animacao_atual = None
+        self._janela_animacao = None
 
     def _exportar_animacao(self) -> None:
         if self._resultado is None:
