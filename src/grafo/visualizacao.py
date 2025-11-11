@@ -363,24 +363,13 @@ def animar_verificacao(
 
     plt.tight_layout()
 
-    if mostrar:
-        area_botao = fig.add_axes([0.92, 0.9, 0.06, 0.08])
-        area_botao.set_anchor("NE")
-        for spine in area_botao.spines.values():
-            spine.set_visible(False)
-
-        botao_fechar = Button(
-            area_botao,
-            label="✕",
-            color="#f1f5f9",
-            hovercolor="#fee2e2",
-        )
-        botao_fechar.label.set_fontsize(14)
-
-        def _fechar_animacao(_event: object) -> None:
-            plt.close(fig)
-
-        botao_fechar.on_clicked(_fechar_animacao)
+    intervalo_base = max(1, intervalo_ms)
+    estado_animacao: dict[str, object] = {
+        "indice_atual": 0,
+        "pausado": False,
+        "intervalo": float(intervalo_base),
+        "intervalo_base": float(intervalo_base),
+    }
 
     def atualizar(indice: int) -> Sequence[object]:
         passo = passos[indice]
@@ -389,6 +378,7 @@ def animar_verificacao(
         cores_arestas = _cores_arestas_passo(grafo_nx, passo)
         colecao_arestas.set_color(cores_arestas)
         texto_info.set_text(_formatar_texto_passo(passo))
+        estado_animacao["indice_atual"] = indice
         if titulo:
             eixo_grafo.set_title(f"{titulo} — etapa {indice + 1}/{len(passos)}")
         return colecao_vertices, colecao_arestas, texto_info
@@ -406,13 +396,133 @@ def animar_verificacao(
         fig,
         atualizar,
         frames=len(passos),
-        interval=max(1, intervalo_ms),
+        interval=intervalo_base,
         repeat=False,
         init_func=inicializar,
         blit=True,
         cache_frame_data=False,
     )
     setattr(fig, "_animacao_ref", animacao)
+
+    if mostrar:
+        area_botao = fig.add_axes([0.92, 0.9, 0.06, 0.08])
+        area_botao.set_anchor("NE")
+        for spine in area_botao.spines.values():
+            spine.set_visible(False)
+
+        botao_fechar = Button(
+            area_botao,
+            label="✕",
+            color="#f1f5f9",
+            hovercolor="#fee2e2",
+        )
+        botao_fechar.label.set_fontsize(14)
+
+        def _fechar_animacao(_event: object) -> None:
+            animacao.event_source.stop()
+            plt.close(fig)
+
+        botao_fechar.on_clicked(_fechar_animacao)
+
+        total_passos = len(passos)
+        texto_velocidade = fig.text(0.5, 0.02, "Velocidade: 1.0×", ha="center", va="center", fontsize=10)
+
+        def _definir_intervalo(novo_intervalo: float) -> None:
+            limite_inferior = 30.0
+            limite_superior = 5000.0
+            intervalo_ajustado = max(limite_inferior, min(limite_superior, novo_intervalo))
+            estado_animacao["intervalo"] = intervalo_ajustado
+            animacao.event_source.interval = int(intervalo_ajustado)
+            fator = estado_animacao["intervalo_base"] / intervalo_ajustado
+            texto_velocidade.set_text(f"Velocidade: {fator:.1f}×")
+            fig.canvas.draw_idle()
+
+        def _pausar_retomar(_event: object) -> None:
+            if total_passos == 0:
+                return
+            pausado = bool(estado_animacao["pausado"])
+            if pausado:
+                animacao.event_source.start()
+                botao_pausa.label.set_text("⏸")
+            else:
+                animacao.event_source.stop()
+                botao_pausa.label.set_text("▶")
+            estado_animacao["pausado"] = not pausado
+            fig.canvas.draw_idle()
+
+        def _mostrar_passo(indice: int) -> None:
+            if total_passos == 0:
+                return
+            indice_limitado = max(0, min(total_passos - 1, indice))
+            animacao.event_source.stop()
+            estado_animacao["pausado"] = True
+            botao_pausa.label.set_text("▶")
+            atualizar(indice_limitado)
+            fig.canvas.draw_idle()
+            proximo_indice = indice_limitado + 1 if indice_limitado < total_passos - 1 else indice_limitado
+            animacao.frame_seq = iter(range(proximo_indice, total_passos))
+
+        def _avancar(_event: object) -> None:
+            indice_atual = int(estado_animacao["indice_atual"])
+            _mostrar_passo(indice_atual + 1)
+
+        def _voltar(_event: object) -> None:
+            indice_atual = int(estado_animacao["indice_atual"])
+            _mostrar_passo(indice_atual - 1)
+
+        def _acelerar(_event: object) -> None:
+            intervalo_atual = float(estado_animacao["intervalo"])
+            _definir_intervalo(intervalo_atual * 0.5)
+
+        def _desacelerar(_event: object) -> None:
+            intervalo_atual = float(estado_animacao["intervalo"])
+            _definir_intervalo(intervalo_atual * 2.0)
+
+        largura_botao = 0.12
+        altura_botao = 0.065
+        espacamento = 0.015
+        x_inicial = 0.2
+        y_botao = 0.04
+
+        def _criar_eixo(indice_botao: int) -> "plt.Axes":
+            eixo = fig.add_axes(
+                [
+                    x_inicial + indice_botao * (largura_botao + espacamento),
+                    y_botao,
+                    largura_botao,
+                    altura_botao,
+                ]
+            )
+            eixo.set_facecolor("#f8fafc")
+            for spine in eixo.spines.values():
+                spine.set_visible(False)
+            return eixo
+
+        eixo_voltar = _criar_eixo(0)
+        eixo_pausa = _criar_eixo(1)
+        eixo_avancar = _criar_eixo(2)
+        eixo_lento = _criar_eixo(3)
+        eixo_rapido = _criar_eixo(4)
+
+        botao_voltar = Button(eixo_voltar, label="◀", color="#e2e8f0", hovercolor="#cbd5f5")
+        botao_pausa = Button(eixo_pausa, label="⏸", color="#e2e8f0", hovercolor="#cbd5f5")
+        botao_avancar = Button(eixo_avancar, label="▶", color="#e2e8f0", hovercolor="#cbd5f5")
+        botao_lento = Button(eixo_lento, label="−", color="#e2e8f0", hovercolor="#cbd5f5")
+        botao_rapido = Button(eixo_rapido, label="+", color="#e2e8f0", hovercolor="#cbd5f5")
+
+        for button in (botao_voltar, botao_pausa, botao_avancar, botao_lento, botao_rapido):
+            button.label.set_fontsize(12)
+
+        botao_voltar.on_clicked(_voltar)
+        botao_pausa.on_clicked(_pausar_retomar)
+        botao_avancar.on_clicked(_avancar)
+        botao_lento.on_clicked(_desacelerar)
+        botao_rapido.on_clicked(_acelerar)
+
+        if total_passos == 0:
+            botao_pausa.label.set_text("—")
+            for button in (botao_voltar, botao_avancar, botao_lento, botao_rapido):
+                button.label.set_color("#94a3b8")
 
     if caminho_saida:
         caminho = Path(caminho_saida)
