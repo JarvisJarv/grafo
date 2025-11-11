@@ -1,6 +1,7 @@
 """Rotinas de visualização de grafos usando matplotlib e networkx."""
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Tuple
 
@@ -16,6 +17,23 @@ except ImportError as exc:  # pragma: no cover - tratado pelo chamador
     raise
 
 Posicoes = Dict[str, Tuple[float, float]]
+
+_ANIMACOES_ATIVAS: List[FuncAnimation] = []
+
+
+def _registrar_animacao_ativa(figura: "plt.Figure", animacao: FuncAnimation) -> None:
+    """Mantém referência às animações enquanto a janela estiver aberta."""
+
+    _ANIMACOES_ATIVAS.append(animacao)
+
+    def _remover_animacao(_event: object) -> None:
+        try:
+            _ANIMACOES_ATIVAS.remove(animacao)
+        except ValueError:
+            pass
+
+    if figura.canvas is not None:
+        figura.canvas.mpl_connect("close_event", _remover_animacao)
 
 
 def _ajustar_limites_eixo(eixo: "plt.Axes", posicoes: Posicoes, margem: float = 0.15) -> None:
@@ -249,7 +267,13 @@ def exibir_grafo(
             )
         eixo.legend(handles=elementos_legenda, loc="upper right")
 
-    plt.tight_layout()
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            "This figure includes Axes that are not compatible with tight_layout",
+            UserWarning,
+        )
+        plt.tight_layout()
 
     if caminho_saida is not None:
         caminho = Path(caminho_saida)
@@ -361,7 +385,13 @@ def animar_verificacao(
     )
     texto_info.set_animated(True)
 
-    plt.tight_layout()
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            "This figure includes Axes that are not compatible with tight_layout",
+            UserWarning,
+        )
+        plt.tight_layout()
 
     intervalo_base = max(1, intervalo_ms)
     estado_animacao: dict[str, object] = {
@@ -402,6 +432,7 @@ def animar_verificacao(
         blit=False,
         cache_frame_data=False,
     )
+    _registrar_animacao_ativa(fig, animacao)
     setattr(fig, "_animacao_ref", animacao)
 
     if mostrar:

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tupl
 
 import networkx as nx
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.animation import FuncAnimation
 from matplotlib.figure import Figure
 from matplotlib.patches import Ellipse, FancyArrowPatch
 from PySide6.QtCore import Qt
@@ -101,6 +102,7 @@ class VisualizadorBipartido(QMainWindow):
         self._arquivo_atual: Optional[Path] = None
         self._layout_atual: str = "flechas"
         self._assinatura_conflitos: Optional[Tuple[Tuple[str, str], ...]] = None
+        self._animacao_atual: Optional[FuncAnimation] = None
 
         self._aplicar_tema_moderno()
         self._criar_componentes()
@@ -400,7 +402,7 @@ class VisualizadorBipartido(QMainWindow):
             titulo += f" — {self._arquivo_atual.name}"
 
         try:
-            animar_verificacao(
+            animacao = animar_verificacao(
                 self._grafo,
                 layout=layout_animacao,
                 titulo=titulo,
@@ -408,6 +410,13 @@ class VisualizadorBipartido(QMainWindow):
                 fps=2,
                 intervalo_ms=600,
             )
+            self._animacao_atual = animacao
+            figura = getattr(animacao, "_fig", None)
+            if figura is not None and figura.canvas is not None:
+                figura.canvas.mpl_connect(
+                    "close_event",
+                    lambda _event: setattr(self, "_animacao_atual", None),
+                )
         except RuntimeError as exc:  # pragma: no cover - interface
             self._mostrar_erro("Não foi possível exibir a animação", exc)
         except Exception as exc:  # pragma: no cover - interface
