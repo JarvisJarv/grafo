@@ -50,3 +50,12 @@ def test_registro_animacao_remove_ao_fechar() -> None:
     figura.canvas.callbacks.process("close_event", None)
 
     assert animacao not in _ANIMACOES_ATIVAS
+
+
+def test_animar_verificacao_backend_sem_interface(
+    grafo_simples: GrafoBipartido, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("grafo.visualizacao._backend_interativo", lambda: False)
+
+    with pytest.raises(RuntimeError, match="backend"):
+        animar_verificacao(grafo_simples, mostrar=True)
