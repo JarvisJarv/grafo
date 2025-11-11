@@ -399,24 +399,28 @@ def animar_verificacao(
         interval=intervalo_base,
         repeat=False,
         init_func=inicializar,
-        blit=True,
+        blit=False,
         cache_frame_data=False,
     )
     setattr(fig, "_animacao_ref", animacao)
 
     if mostrar:
-        area_botao = fig.add_axes([0.92, 0.9, 0.06, 0.08])
+        fig.subplots_adjust(top=0.9, bottom=0.18)
+
+        area_botao = fig.add_axes([0.84, 0.88, 0.12, 0.08])
         area_botao.set_anchor("NE")
+        area_botao.set_facecolor("#fee2e2")
         for spine in area_botao.spines.values():
             spine.set_visible(False)
 
         botao_fechar = Button(
             area_botao,
-            label="Fechar",
-            color="#f1f5f9",
-            hovercolor="#fee2e2",
+            label="✕ Fechar",
+            color="#fee2e2",
+            hovercolor="#fecaca",
         )
-        botao_fechar.label.set_fontsize(11)
+        botao_fechar.label.set_fontsize(12)
+        botao_fechar.label.set_color("#7f1d1d")
 
         def _fechar_animacao(_event: object) -> None:
             animacao.event_source.stop()
@@ -425,7 +429,14 @@ def animar_verificacao(
         botao_fechar.on_clicked(_fechar_animacao)
 
         total_passos = len(passos)
-        texto_velocidade = fig.text(0.5, 0.02, "Velocidade: 1.0×", ha="center", va="center", fontsize=10)
+        texto_velocidade = fig.text(
+            0.5,
+            0.04,
+            "Velocidade: 1.0×",
+            ha="center",
+            va="center",
+            fontsize=10,
+        )
 
         def _definir_intervalo(novo_intervalo: float) -> None:
             limite_inferior = 30.0
@@ -446,7 +457,7 @@ def animar_verificacao(
                 botao_pausa.label.set_text("Pausar")
             else:
                 animacao.event_source.stop()
-                botao_pausa.label.set_text("Retomar")
+                botao_pausa.label.set_text("Despausar")
             estado_animacao["pausado"] = not pausado
             fig.canvas.draw_idle()
 
@@ -456,7 +467,7 @@ def animar_verificacao(
             indice_limitado = max(0, min(total_passos - 1, indice))
             animacao.event_source.stop()
             estado_animacao["pausado"] = True
-            botao_pausa.label.set_text("Retomar")
+            botao_pausa.label.set_text("Despausar")
             atualizar(indice_limitado)
             fig.canvas.draw_idle()
             proximo_indice = indice_limitado + 1 if indice_limitado < total_passos - 1 else indice_limitado
@@ -478,11 +489,18 @@ def animar_verificacao(
             intervalo_atual = float(estado_animacao["intervalo"])
             _definir_intervalo(intervalo_atual * 2.0)
 
-        largura_botao = 0.16
-        altura_botao = 0.07
-        espacamento = 0.02
-        x_inicial = 0.16
-        y_botao = 0.04
+        largura_botao = 0.14
+        altura_botao = 0.075
+        espacamento = 0.025
+        x_inicial = 0.14
+        y_botao = 0.06
+
+        painel_controles = fig.add_axes([0.08, 0.01, 0.84, 0.13])
+        painel_controles.set_facecolor("#f1f5f9")
+        painel_controles.set_xticks([])
+        painel_controles.set_yticks([])
+        for spine in painel_controles.spines.values():
+            spine.set_visible(False)
 
         def _criar_eixo(indice_botao: int) -> "plt.Axes":
             eixo = fig.add_axes(
@@ -493,7 +511,7 @@ def animar_verificacao(
                     altura_botao,
                 ]
             )
-            eixo.set_facecolor("#f8fafc")
+            eixo.set_facecolor("#e2e8f0")
             for spine in eixo.spines.values():
                 spine.set_visible(False)
             return eixo
@@ -536,7 +554,8 @@ def animar_verificacao(
         )
 
         for button in (botao_voltar, botao_pausa, botao_avancar, botao_lento, botao_rapido):
-            button.label.set_fontsize(10)
+            button.label.set_fontsize(11)
+            button.label.set_color("#0f172a")
 
         botao_voltar.on_clicked(_voltar)
         botao_pausa.on_clicked(_pausar_retomar)
