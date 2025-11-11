@@ -675,23 +675,6 @@ class VisualizadorBipartido(QMainWindow):
             titulo += f" — {self._arquivo_atual.name}"
         ax.set_title(titulo)
 
-        legenda_itens = [
-            ("🟦", "Partição 0"),
-            ("🟧", "Partição 1"),
-            ("🔴", "Conflito" if resultado.conflitos else "Conexão"),
-        ]
-        linhas = [f"{emoji} {texto}" for emoji, texto in legenda_itens]
-        ax.text(
-            0.02,
-            0.02,
-            "\n".join(linhas),
-            transform=ax.transAxes,
-            ha="left",
-            va="bottom",
-            fontsize=10,
-            bbox=dict(boxstyle="round", facecolor="white", alpha=0.9),
-        )
-
         self.canvas.draw_idle()
 
     # ------------------------------------------------------------------

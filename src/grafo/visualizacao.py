@@ -261,13 +261,19 @@ def animar_verificacao(
     resultado, passos = grafo.verificar_biparticao_com_passos()
     grafo_nx, posicoes, _, _, _ = preparar_desenho(grafo, layout=layout)
 
-    fig, eixo = plt.subplots(figsize=(8, 6))
+    fig, (eixo_grafo, eixo_info) = plt.subplots(
+        1,
+        2,
+        figsize=(11, 6),
+        gridspec_kw={"width_ratios": [3.8, 1.5]},
+    )
     fig.patch.set_facecolor("#f8fafc")
-    colecao_arestas = nx.draw_networkx_edges(grafo_nx, posicoes, ax=eixo, width=2)
+    eixo_info.set_facecolor("#e2e8f0")
+    colecao_arestas = nx.draw_networkx_edges(grafo_nx, posicoes, ax=eixo_grafo, width=2)
     colecao_vertices = nx.draw_networkx_nodes(
         grafo_nx,
         posicoes,
-        ax=eixo,
+        ax=eixo_grafo,
         node_color=_cores_vertices_passo(grafo_nx, passos[0]) if passos else "tab:gray",
         node_size=900,
         linewidths=1.5,
@@ -277,16 +283,16 @@ def animar_verificacao(
     nx.draw_networkx_labels(
         grafo_nx,
         posicoes_rotulos,
-        ax=eixo,
+        ax=eixo_grafo,
         font_weight="bold",
         verticalalignment="bottom",
         bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="none", alpha=0.85),
     )
 
-    eixo.set_axis_off()
+    eixo_grafo.set_axis_off()
 
     if titulo:
-        eixo.set_title(titulo)
+        eixo_grafo.set_title(titulo)
 
     particao_a, particao_b = resultado.particoes
     elementos_legenda = [
@@ -296,15 +302,21 @@ def animar_verificacao(
         plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="mediumpurple", label="Fila"),
         plt.Line2D([0], [0], color="red", lw=2, label="Conflito"),
     ]
-    eixo.legend(handles=elementos_legenda, loc="upper right")
+    eixo_grafo.legend(handles=elementos_legenda, loc="upper right")
 
-    texto_info = eixo.text(
-        0.02,
-        0.98,
+    eixo_info.set_axis_off()
+    eixo_info.set_xlim(0, 1)
+    eixo_info.set_ylim(0, 1)
+
+    texto_info = eixo_info.text(
+        0.0,
+        1.0,
         _formatar_texto_passo(passos[0]) if passos else "",
-        transform=eixo.transAxes,
+        transform=eixo_info.transAxes,
         verticalalignment="top",
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.9),
+        horizontalalignment="left",
+        wrap=True,
+        bbox=dict(boxstyle="round", facecolor="white", alpha=0.95),
     )
 
     plt.tight_layout()
@@ -317,7 +329,7 @@ def animar_verificacao(
         colecao_arestas.set_color(cores_arestas)
         texto_info.set_text(_formatar_texto_passo(passo))
         if titulo:
-            eixo.set_title(f"{titulo} — etapa {indice + 1}/{len(passos)}")
+            eixo_grafo.set_title(f"{titulo} — etapa {indice + 1}/{len(passos)}")
         return colecao_vertices, colecao_arestas, texto_info
 
     animacao = FuncAnimation(
